@@ -4,6 +4,6 @@ namespace WebAPI.Core.Interface
 {
     public interface IUserRegistration
     {
-        public Task Registration(Registration registration);
+        public (int Error, string ErrorMessage) Registration(Registration registration);
     }
 }

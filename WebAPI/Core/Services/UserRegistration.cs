@@ -11,18 +11,20 @@ namespace WebAPI.Core.Services
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
+
+        public int statusID;
         public UserRegistration(IConfiguration config)
         {
             _configuration = config;
             _connectionString = _configuration.GetConnectionString("myConnection").Trim();
         }
 
-        public async Task Registration(Registration registration)
+        public (int Error, string ErrorMessage) Registration(Registration registration)
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            using var connection = new NpgsqlConnection(_connectionString);
             try
             {
-                await using var cmd = new NpgsqlCommand("public.insert_users", connection)
+                using var cmd = new NpgsqlCommand("public.insert_users", connection)
                 {
                     CommandType = CommandType.StoredProcedure
                 };
@@ -30,16 +32,19 @@ namespace WebAPI.Core.Services
                 cmd.Parameters.AddWithValue("_lastname", NpgsqlDbType.Varchar, registration.LastName);
                 cmd.Parameters.AddWithValue("_username", NpgsqlDbType.Varchar, registration.UserName);
                 cmd.Parameters.AddWithValue("_password", NpgsqlDbType.Varchar, registration.Password);
-              
-                await connection.OpenAsync();
-                await cmd.ExecuteNonQueryAsync();
-                connection.Close();
+
+                connection.Open();
+                cmd.ExecuteNonQuery();
+
+
+                return (0, "done");
             }
+
             catch (Exception e)
             {
-                await Task.Delay(100);
-                throw new Exception("Error-" + e);
-            }          
+                return (-1, e.Message);
+            }
         }
     }
+   
 }

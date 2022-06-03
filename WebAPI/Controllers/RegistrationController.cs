@@ -17,10 +17,23 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("Registration")]
-        public void UserRegistration([FromBody] Registration filter)
+        public async Task<IActionResult> UserRegistration([FromBody] Registration filter)
         {
-            _registrationService.Registration(filter);
+            //try
+
+
+            var data =  _registrationService.Registration(filter);
+            return Ok(data.ErrorMessage);
+
+            //return Ok(data);
+
+
+            //catch (Exception ex)
+            //{
+            //    throw new Exception("Error Message ", ex);
+            //}
         }
+        
         [HttpGet("")]
         public async Task<string> GetRegistrationById()
         {
