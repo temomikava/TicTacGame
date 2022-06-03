@@ -10,6 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IUserRegistration, UserRegistration>();
+builder.Services.AddScoped<IUserAuthorization, UserAuthorization>();
 
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";

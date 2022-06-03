@@ -11,8 +11,7 @@ namespace WebAPI.Core.Services
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
-
-        public int statusID;
+       
         public UserRegistration(IConfiguration config)
         {
             _configuration = config;
@@ -24,18 +23,16 @@ namespace WebAPI.Core.Services
             using var connection = new NpgsqlConnection(_connectionString);
             try
             {
-                using var cmd = new NpgsqlCommand("public.insert_users", connection)
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
-                cmd.Parameters.AddWithValue("_firstname", NpgsqlDbType.Varchar, registration.FirstName);
-                cmd.Parameters.AddWithValue("_lastname", NpgsqlDbType.Varchar, registration.LastName);
-                cmd.Parameters.AddWithValue("_username", NpgsqlDbType.Varchar, registration.UserName);
-                cmd.Parameters.AddWithValue("_password", NpgsqlDbType.Varchar, registration.Password);
-
                 connection.Open();
-                cmd.ExecuteNonQuery();
-
+                using (var cmd = new NpgsqlCommand("public.insert_users", connection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("_firstname", NpgsqlDbType.Varchar, registration.FirstName);
+                    cmd.Parameters.AddWithValue("_lastname", NpgsqlDbType.Varchar, registration.LastName);
+                    cmd.Parameters.AddWithValue("_username", NpgsqlDbType.Varchar, registration.UserName);
+                    cmd.Parameters.AddWithValue("_password", NpgsqlDbType.Varchar, registration.Password);
+                    cmd.ExecuteNonQuery();
+                };
 
                 return (0, "done");
             }
