@@ -9,28 +9,28 @@ namespace WebAPI.Controllers
     [ApiController]
     public class ApiController : Controller
     {
-        private readonly IUserRegistration _registrationService;
-        private readonly IUserAuthorization _authorizationService;
-        public ApiController(IUserRegistration registrationService, IUserAuthorization userAuthorization)
+        private readonly IDatabaseConnection _connection;
+        public ApiController(IDatabaseConnection connection )
         {
-            _registrationService = registrationService;
-            _authorizationService = userAuthorization;
+            _connection = connection;
         }
 
 
         [HttpPost("Registration")]
-        public async Task<IActionResult> UserRegistration([FromBody] Registration filter)
+        public async Task<IActionResult> UserRegistration([FromBody] RegistrationModel filter)
         {         
-            var data =  _registrationService.Registration(filter);
+            var data =  _connection.Registration(filter);
             return Ok(data.ErrorMessage);
         }
 
         [HttpPost("Authorization")]
-        public async Task<IActionResult> UserAuthorization([FromBody]Authorization filter)
+        public async Task<IActionResult> UserAuthorization([FromBody]AuthorizationModel filter)
         {           
-            var data=_authorizationService.Authorization(filter);
+            var data=_connection.Authorization(filter);
             return Ok(data.ErrorMessage);
         }
+
+        
 
     }
 }

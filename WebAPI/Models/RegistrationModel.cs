@@ -2,7 +2,7 @@
 
 namespace WebAPI.Models
 {
-    public class Registration
+    public class RegistrationModel
     {       
         public string FirstName { get; set; }
         public string LastName { get; set; }

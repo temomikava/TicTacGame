@@ -1,0 +1,75 @@
+﻿using Npgsql;
+using NpgsqlTypes;
+using System.Data;
+using WebAPI.Core.Interface;
+using WebAPI.Models;
+
+namespace WebAPI.Core.Services
+{
+    public class DatabaseConnection :IDatabaseConnection
+    {
+        private readonly IConfiguration _configuration;
+        private readonly string _connectionString;
+
+        public DatabaseConnection(IConfiguration config)
+        {
+            _configuration = config;
+            _connectionString = _configuration.GetConnectionString("myConnection").Trim();
+        }
+
+        public (int Error, string ErrorMessage) Authorization(AuthorizationModel authorization)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        var a = cmd.Parameters.AddWithValue("_username", NpgsqlDbType.Varchar, authorization.UserName);
+                        cmd.Parameters.AddWithValue("_password", NpgsqlDbType.Varchar, authorization.Password);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
+
+                    };
+
+                    return (0, "done");
+                }
+
+                catch (Exception e)
+                {
+                    return (-1, e.Message);
+                }
+            }
+        }
+
+        public (int Error, string ErrorMessage) Registration(RegistrationModel registration)
+        {
+
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    connection.Open();
+                    using (var cmd = new NpgsqlCommand("public.insert_users", connection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("_firstname", NpgsqlDbType.Varchar, registration.FirstName);
+                        cmd.Parameters.AddWithValue("_lastname", NpgsqlDbType.Varchar, registration.LastName);
+                        cmd.Parameters.AddWithValue("_username", NpgsqlDbType.Varchar, registration.UserName);
+                        cmd.Parameters.AddWithValue("_password", NpgsqlDbType.Varchar, registration.Password);
+                        cmd.ExecuteNonQuery();
+                    };
+
+                    return (0, "done");
+                }
+
+                catch (Exception e)
+                {
+                    return (-1, e.Message);
+                }
+            }
+
+
+        }
+    }
+}
