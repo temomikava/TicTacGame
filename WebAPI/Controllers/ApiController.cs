@@ -15,7 +15,11 @@ namespace WebAPI.Controllers
             _connection = connection;
         }
 
-
+        [HttpGet("get")]
+        public async Task<IActionResult> Get()
+        {
+            return Ok("ok");
+        }
         [HttpPost("Registration")]
         public async Task<IActionResult> UserRegistration([FromBody] RegistrationModel filter)
         {         
@@ -29,8 +33,13 @@ namespace WebAPI.Controllers
             var data=_connection.Authorization(filter);
             return Ok(data.ErrorMessage);
         }
+        [HttpPost("Create_match")]
+        public async Task<IActionResult> CreateMatchup([FromBody] Matchup filter)
+        {
+            var data = _connection.CreateMatch(filter);
+            return Ok(data.ErrorMessage);
+        }
 
-        
 
     }
 }

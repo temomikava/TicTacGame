@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GameLibrary
+namespace GameLibrary.Enums
 {
-    public enum WinType
+    public enum Mark
     {
-        Row, Column, MainDiagonal, AntiDiagonal
+        None, X, O
     }
 }

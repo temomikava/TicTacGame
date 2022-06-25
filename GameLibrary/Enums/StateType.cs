@@ -2,6 +2,6 @@
 {
     public enum StateType
     {
-        InProgress, Finishid, Waiting
+        Waiting, InProgress, Finishid, Canceled
     }
 }
