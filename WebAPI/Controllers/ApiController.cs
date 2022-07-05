@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 using WebAPI.Core.Interface;
 using WebAPI.Models;
 
@@ -10,35 +11,29 @@ namespace WebAPI.Controllers
     public class ApiController : Controller
     {
         private readonly IDatabaseConnection _connection;
-        public ApiController(IDatabaseConnection connection )
+        public ApiController(IDatabaseConnection connection)
         {
             _connection = connection;
         }
 
-        [HttpGet("get")]
-        public async Task<IActionResult> Get()
-        {
-            return Ok("ok");
-        }
         [HttpPost("Registration")]
         public async Task<IActionResult> UserRegistration([FromBody] RegistrationModel filter)
-        {         
-            var data =  _connection.Registration(filter);
+        {
+            var data = _connection.Registration(filter);
             return Ok(data.ErrorMessage);
         }
 
         [HttpPost("Authorization")]
-        public async Task<IActionResult> UserAuthorization([FromBody]AuthorizationModel filter)
-        {           
-            var data=_connection.Authorization(filter);
-            return Ok(data.ErrorMessage);
-        }
-        [HttpPost("Create_match")]
-        public async Task<IActionResult> CreateMatchup([FromBody] Matchup filter)
+        public async Task<IActionResult> UserAuthorization([FromBody] AuthorizationModel filter)
         {
-            var data = _connection.CreateMatch(filter);
-            return Ok(data.ErrorMessage);
+            var data = _connection.Authorization(filter);
+            if (data.SessionId==Guid.Empty)
+            {
+                return Ok(data.ErrorMessage);
+            }
+            else return Ok(data.SessionId);
         }
+
 
 
     }

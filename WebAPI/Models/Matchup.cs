@@ -1,4 +1,6 @@
-﻿namespace WebAPI.Models
+﻿using System;
+
+namespace WebAPI.Models
 {
     public class Matchup
     {

@@ -6,25 +6,25 @@ namespace GameLibrary
     public class Match
     {
         public int Id { get; set; }
-        public DateTime StartedAt { get; set; }= DateTime.Now;
+        public DateTime StartedAt { get; set; } = DateTime.Now;
         public DateTime FinishedAt { get; set; }
-        public Mark[,] GameGrid { get; private set; } 
+        public Mark[,] GameGrid { get; private set; }
         public Mark CurrentPlayer { get; private set; } = Mark.X;
         public int TurnsPassed { get; private set; } = 0;
-        public bool MatchOver { get; private set; }=false;
+        public bool MatchOver { get; private set; } = false;
         public WinInfo WinInfo { get; private set; }
         public MatchResult MatchResult { get; private set; }
 
         //public event Action<int, int> MoveMade;
         //public event Action<MatchResult> GameEnded;
         //public event Action GameRestarted;
-
-        public Match(int boardSize)
+        private int boardSize = Game.BoardSize;
+        public Match()
         {
-            GameGrid = new Mark[boardSize, boardSize];                               
+            GameGrid = new Mark[boardSize, boardSize];
         }
 
-        
+
         private bool IsGridFull()
         {
             return TurnsPassed == GameGrid.Length;
@@ -43,8 +43,8 @@ namespace GameLibrary
                 {
                     return false;
                 }
-                
-            }   
+
+            }
             return true;
         }
 
@@ -77,7 +77,7 @@ namespace GameLibrary
                 WinInfo = new WinInfo { Type = WinType.MainDiagonal };
                 return true;
             }
-            
+
             return false;
         }
 
@@ -86,6 +86,7 @@ namespace GameLibrary
             if (DidMoveWin(r, c))
             {
                 MatchResult = new MatchResult { Winner = CurrentPlayer, WinInfo = WinInfo };
+
                 return true;
             }
             if (IsGridFull())
@@ -93,7 +94,7 @@ namespace GameLibrary
                 MatchResult = new MatchResult { Winner = Mark.None };
                 return true;
             }
-            
+
             return false;
         }
         private (short ErrorCode, string ErrorMessage) CanMakeMove(int r, int c)
@@ -108,7 +109,7 @@ namespace GameLibrary
             }
             else if (MatchOver)
             {
-                return ((short)ErrorCode.MatchIsOver, "Match is over" );
+                return ((short)ErrorCode.MatchIsOver, "Match is over");
             }
             else if (GameGrid[r, c] != Mark.None)
             {
@@ -118,7 +119,7 @@ namespace GameLibrary
         }
         public (short ErrorCode, string ErrorMessage) MakeMove(int r, int c)
         {
-            
+
             var canMakeMove = CanMakeMove(r, c);
             if (canMakeMove.ErrorCode != (short)ErrorCode.Success)
             {
@@ -130,7 +131,7 @@ namespace GameLibrary
             if (DidMoveEndMatch(r, c))
             {
                 MatchOver = true;
-                FinishedAt=DateTime.Now;
+                FinishedAt = DateTime.Now;
                 //MoveMade?.Invoke(r, c);
                 //GameEnded?.Invoke(MatchResult);
             }
@@ -150,7 +151,7 @@ namespace GameLibrary
             MatchOver = false;
             //GameRestarted?.Invoke();
         }
-        
-        
+
+
     }
 }

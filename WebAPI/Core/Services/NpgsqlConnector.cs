@@ -1,4 +1,7 @@
-﻿using Npgsql;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
+using NpgsqlTypes;
+using System;
 using System.Data;
 using WebAPI.Core.Interface;
 using WebAPI.Models;
@@ -15,8 +18,26 @@ namespace WebAPI.Core.Services
             _configuration = config;
             _connectionString = _configuration.GetConnectionString("myConnection").Trim();
         }
+        public int GetUserId(string sessionId)
+        {
+            int userId = 0;
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var cmd = new NpgsqlCommand("get_playerid_by_sesseionid", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.Add("_playerid", NpgsqlDbType.Integer).Direction = ParameterDirection.Output;
+                    userId = (int)cmd.Parameters["_playerid"].Value;
 
-        public (int Error, string ErrorMessage) Authorization(AuthorizationModel authorization)
+                }
+                catch (Exception ex)
+                {
+                    return -1;
+                }
+            }
+            return userId;
+        }
+        public (int Error, string ErrorMessage, Guid SessionId) Authorization(AuthorizationModel authorization)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -25,14 +46,16 @@ namespace WebAPI.Core.Services
                     var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure };
                     var a = cmd.Parameters.AddWithValue("_username", authorization.UserName);
                     cmd.Parameters.AddWithValue("_password", authorization.Password);
+                    cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
                     connection.Open();
                     cmd.ExecuteNonQuery();
-                    return (0, "done");
+                    authorization.SessionID = (Guid)cmd.ExecuteScalar();
+                    return (0,"done", authorization.SessionID);
                 }
 
                 catch (Exception e)
                 {
-                    return (-1, e.Message);
+                    return (-1, e.Message, authorization.SessionID);
                 }
             }
         }
@@ -102,7 +125,7 @@ namespace WebAPI.Core.Services
         }
         public (int Error, string ErrorMessage) StartMatch(Matchup match)
         {
-            GameLibrary.Match startGame = new GameLibrary.Match(3);
+            GameLibrary.Match startGame = new GameLibrary.Match();
             return startGame.MakeMove(2, 1);
             
         }
