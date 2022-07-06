@@ -18,24 +18,29 @@ namespace WebAPI.Core.Services
             _configuration = config;
             _connectionString = _configuration.GetConnectionString("myConnection").Trim();
         }
-        public int GetUserId(string sessionId)
+        public int GetUserId(Guid sessionId)
         {
-            int userId = 0;
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 try
                 {
-                    var cmd = new NpgsqlCommand("get_playerid_by_sesseionid", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.Add("_playerid", NpgsqlDbType.Integer).Direction = ParameterDirection.Output;
-                    userId = (int)cmd.Parameters["_playerid"].Value;
+                    var cmd = new NpgsqlCommand("authorize", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.Add("_sessionid", NpgsqlDbType.Uuid); 
+                    cmd.Parameters["_sessionid"].Value = sessionId;
 
+                    connection.Open();
+
+                    var id = cmd.ExecuteScalar();
+                    if (id == null)
+                        return -1;
+                    return (int)id;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     return -1;
                 }
             }
-            return userId;
+            return -1;
         }
         public (int Error, string ErrorMessage, Guid SessionId) Authorization(AuthorizationModel authorization)
         {
@@ -48,7 +53,7 @@ namespace WebAPI.Core.Services
                     cmd.Parameters.AddWithValue("_password", authorization.Password);
                     cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
                     connection.Open();
-                    cmd.ExecuteNonQuery();
+                    //cmd.ExecuteNonQuery();
                     authorization.SessionID = (Guid)cmd.ExecuteScalar();
                     return (0,"done", authorization.SessionID);
                 }

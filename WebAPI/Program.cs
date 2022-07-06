@@ -17,7 +17,7 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IDatabaseConnection, NpgsqlConnector>();
-
+builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
@@ -50,23 +50,33 @@ if (app.Environment.IsDevelopment())
 
 app.Use(async (context, next) =>
 {
-    if (!context.Request.Path.StartsWithSegments("/signalr"))
+    if (context.Request.Path.StartsWithSegments("/signalr"))
     {
+       
+        var sessionId = context.Request.Headers["Authorization"].ToString()?.Split()?.LastOrDefault();
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            context.Response.StatusCode = 401;
+            return;
+        }
+
+        var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
+        var id = dal.GetUserId(Guid.Parse(sessionId));
+
+        //check if session ID is correct
+        if(id == -1)
+        {
+            context.Response.StatusCode = 401;
+            return;
+        }
+
+        var identity = new ClaimsIdentity();
+        identity.AddClaim(new Claim("session_id", sessionId));
+        identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
+        context.User.AddIdentity(identity);
+
         await next();
-        return;
     }
-
-
-    var connectionId = context.Request.Headers["Authorization"].ToString()?.Split()?.LastOrDefault();
-    if (string.IsNullOrEmpty(connectionId))
-    {
-        context.Response.StatusCode = 401;
-        return;
-    }
-
-    var identity = new ClaimsIdentity();
-    identity.AddClaim(new Claim(ClaimTypes.Name, connectionId));
-    context.User.AddIdentity(identity);
 
     await next();
 });
