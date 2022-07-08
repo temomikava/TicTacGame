@@ -1,7 +1,7 @@
-﻿namespace WebAPI.Enums
+﻿namespace GameLibrary
 {
     public enum StateType
     {
-        Waiting, InProgress, Finishid, Canceled
+        Created=1, Started, Finishid, Canceled
     }
 }

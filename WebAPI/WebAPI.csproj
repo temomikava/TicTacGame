@@ -9,12 +9,17 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.6" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="6.0.6" />
     <PackageReference Include="Npgsql" Version="6.0.4" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GameLibrary\GameLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Events\" />
   </ItemGroup>
 
 </Project>

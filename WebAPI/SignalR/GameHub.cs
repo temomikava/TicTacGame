@@ -8,25 +8,32 @@ using System.Threading.Tasks;
 using WebAPI.Core.Interface;
 using WebAPI.Core.Services;
 using WebAPI.Models;
+using GameLibrary;
 
 namespace WebAPI.SignalR
 {
     
     public class GameHub : Hub
     {
+        IDatabaseConnection _connection;
+        public GameHub(IDatabaseConnection connection)
+        {
+            _connection=connection;
+        }
         private static ConcurrentDictionary<string, HashSet<string>> _users = new ConcurrentDictionary<string, HashSet<string>>();
 
         public override async Task OnConnectedAsync()
         {
+
             var id = Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
-            var connId = Context.ConnectionId;
+            var connid = Context.ConnectionId;
             if (_users.ContainsKey(id))
             {
-                _users[id].Add(connId);
+                _users[id].Add(connid);
             }
-            else  
+            else
             {
-                _users.TryAdd(id, new HashSet<string>() { connId});
+                _users.TryAdd(id, new HashSet<string>() { connid });
             }
 
         }
@@ -34,6 +41,7 @@ namespace WebAPI.SignalR
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
+
             var id = Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
             var connId = Context.ConnectionId;
             if (_users[id].Count > 1)
@@ -48,33 +56,43 @@ namespace WebAPI.SignalR
         }
 
 
-        //public Task<bool> IsConnected { get; set; } 
-        //public Task<bool> IsLoggedIn { get; set; }       
-        public static List<(uint boarsize, uint scoretarget)> AvailableBoards = new List<(uint boarsize, uint scoretarget)>();
+             
+        public static List<Matchup> CreatedMatches = new List<Matchup>();
+        
+        
 
-        public async Task CreateBoard(uint boardSize, uint scoreTarget)
+        public async Task CreateMatch(int boardSize, int scoreTarget)
         {
             string message = "success";
             if (boardSize < 3)
             {
                 message = "board size cannot be less than 3";
-                await Clients.Caller.SendAsync("createboard", message);
+                await Clients.Caller.SendAsync("onmatchcreate", message,-1);
             }
             else if (scoreTarget < 1)
             {
                 message = "scoretarget cannot be less than 1";
-                await Clients.Caller.SendAsync("getresponse", message);
+                await Clients.Caller.SendAsync("onmatchcreate", message,-1);
             }
             else
             {
-                AvailableBoards.Add((boardSize, scoreTarget));
-                await Clients.Caller.SendAsync("boardcreate", message);
+                Matchup match = new Matchup();
+                match.CreatedAt=DateTime.Now;
+                match.StateId = (int)StateType.Created;
+                match.Points = scoreTarget;
+                match.BoardSize = boardSize;
+                _connection.CreateMatch(match);
+                await Clients.Caller.SendAsync("onmatchcreate", message,1);
+
             }
         }
-        public async Task GetAllBoards()
+        public async Task SendAllMatches()
         {
-            await Clients.All.SendAsync("getallboards", AvailableBoards);
+            List<Matchup> matches = _connection.GetAllMatches();
+            await Clients.All.SendAsync("getallmatches", matches);
+
         }
+       
         public async Task JoinToGame()
         {
 

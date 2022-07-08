@@ -5,13 +5,17 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using WebAPI;
+using Newtonsoft.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddSignalR();
+//builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddNewtonsoftJsonProtocol(opts =>
+        opts.PayloadSerializerSettings.TypeNameHandling = TypeNameHandling.Auto);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -29,9 +33,9 @@ builder.Services.AddCors(options =>
                       builder =>
                       {
                           builder.AllowAnyMethod()
-                          .SetIsOriginAllowed(_ => true)
-                          .AllowCredentials()
-                          .AllowAnyHeader();
+                         .SetIsOriginAllowed(_ => true)
+                         .AllowCredentials()
+                         .AllowAnyHeader();
                       });
 });
 var app = builder.Build();
@@ -52,19 +56,21 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/signalr"))
     {
-       
+
         var sessionId = context.Request.Headers["Authorization"].ToString()?.Split()?.LastOrDefault();
-        if (string.IsNullOrWhiteSpace(sessionId))
+        var isValidSessionId = Guid.TryParse(sessionId, out var validSessionId);
+
+        if (!isValidSessionId)
         {
             context.Response.StatusCode = 401;
             return;
         }
 
         var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
-        var id = dal.GetUserId(Guid.Parse(sessionId));
+        var id = dal.GetUserId(validSessionId);
 
-        //check if session ID is correct
-        if(id == -1)
+
+        if (id == -1)
         {
             context.Response.StatusCode = 401;
             return;
@@ -74,11 +80,10 @@ app.Use(async (context, next) =>
         identity.AddClaim(new Claim("session_id", sessionId));
         identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
         context.User.AddIdentity(identity);
-
-        await next();
+        await next(context);
     }
 
-    await next();
+    await next(context);
 });
 
 

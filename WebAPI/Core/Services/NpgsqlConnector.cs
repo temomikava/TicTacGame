@@ -31,21 +31,23 @@ namespace WebAPI.Core.Services
                     connection.Open();
 
                     var id = cmd.ExecuteScalar();
-                    if (id == null)
-                        return -1;
-                    return (int)id;
+                   
+                    if (id is DBNull)
+                    return -1;
+                        return (int)id;
+                    
+                    
                 }
                 catch (Exception)
                 {
                     return -1;
                 }
             }
-            return -1;
         }
-        public (int Error, string ErrorMessage, Guid SessionId) Authorization(AuthorizationModel authorization)
+        public (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
-            {
+            { 
                 try
                 {
                     var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure };
@@ -53,14 +55,14 @@ namespace WebAPI.Core.Services
                     cmd.Parameters.AddWithValue("_password", authorization.Password);
                     cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
                     connection.Open();
-                    //cmd.ExecuteNonQuery();
-                    authorization.SessionID = (Guid)cmd.ExecuteScalar();
-                    return (0,"done", authorization.SessionID);
+                    var sessionId = (Guid?)cmd.ExecuteScalar();
+                    
+                    return (1,"done", sessionId);
                 }
 
                 catch (Exception e)
                 {
-                    return (-1, e.Message, authorization.SessionID);
+                    return (-1, e.Message, null);
                 }
             }
         }
@@ -112,11 +114,10 @@ namespace WebAPI.Core.Services
                 try
                 {
                     var cmd = new NpgsqlCommand("create_match", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("started_at", match.StartedAt);
-                    cmd.Parameters.AddWithValue("finished_at", match.FinishedAt);
-                    cmd.Parameters.AddWithValue("state_id", match.StateId);
-                    cmd.Parameters.AddWithValue("winner_player_id", match.Winner_Player_id);
-                    cmd.Parameters.AddWithValue("points", match.Points);
+                    cmd.Parameters.AddWithValue("_createdat", match.CreatedAt);
+                    cmd.Parameters.AddWithValue("_stateid", match.StateId);
+                    cmd.Parameters.AddWithValue("_points", match.Points);
+                    cmd.Parameters.AddWithValue("_boardsize", match.BoardSize);
                     connection.Open();
                     cmd.ExecuteNonQuery();
 
@@ -127,6 +128,41 @@ namespace WebAPI.Core.Services
                     return (-1, e.Message);
                 }
             }
+        }
+        public List<Matchup> GetAllMatches()
+        {
+            List<Matchup> output=new List<Matchup>();
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("getallmatches", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        connection.Open();
+                        NpgsqlDataReader reader = cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            Matchup match = new Matchup()
+                            {
+                                Id = (int)reader["_id"],
+                                //reader.GetInt32(0),
+                                StateId = (int)reader["_state_id"],
+                                BoardSize = (int)reader["_board_size"],
+                                Points = (int)reader["_points"]
+                            };
+                            output.Add(match);
+
+                        }
+                        
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+            return output;
         }
         public (int Error, string ErrorMessage) StartMatch(Matchup match)
         {
