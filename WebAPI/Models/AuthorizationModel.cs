@@ -6,8 +6,6 @@ namespace WebAPI.Models
     {      
         public string UserName { get; set; }
         public string Password { get; set; }
-        [JsonIgnore]
-        public Guid? SessionID { get; set; }
-
+        
     }
 }

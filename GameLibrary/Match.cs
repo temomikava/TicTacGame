@@ -2,28 +2,19 @@
 
 namespace GameLibrary
 {
-    public class Match
+    public class Match:Game,IMatch
     {
-        public int Id { get; set; }
-        public DateTime StartedAt { get; set; } = DateTime.Now;
-        public DateTime FinishedAt { get; set; }
-        public Mark[,] GameGrid { get; private set; }
-        public Mark CurrentPlayer { get; private set; } = Mark.X;
-        public int TurnsPassed { get; private set; } = 0;
-        public bool MatchOver { get; private set; } = false;
-        public WinInfo WinInfo { get; private set; }
-        public MatchResult MatchResult { get; private set; }
+        public Mark[,] GameGrid { get;  set; }
+        public Mark CurrentPlayer { get;  set; } = Mark.X;
+        public int TurnsPassed { get;  set; } = 0;
+        public bool MatchOver { get;  set; } = false;
+        public WinInfo WinInfo { get;  set; }
+        public MatchResult MatchResult { get;  set; }
 
         //public event Action<int, int> MoveMade;
         //public event Action<MatchResult> GameEnded;
         //public event Action GameRestarted;
-        private int boardSize = Game.BoardSize;
-        public Match()
-        {
-            GameGrid = new Mark[boardSize, boardSize];
-        }
-
-
+       
         private bool IsGridFull()
         {
             return TurnsPassed == GameGrid.Length;
@@ -31,6 +22,7 @@ namespace GameLibrary
 
         private void SwitchPlayer()
         {
+           
             CurrentPlayer = CurrentPlayer == Mark.X ? Mark.O : Mark.X;
         }
 
@@ -96,7 +88,7 @@ namespace GameLibrary
 
             return false;
         }
-        private (short ErrorCode, string ErrorMessage) CanMakeMove(int r, int c)
+        private (short ErrorCode, string ErrorMessage, bool matchend) CanMakeMove(int r, int c)
         {
             if (r > GameGrid.GetLength(0) - 1 ||
                 r < 0 ||
@@ -104,19 +96,19 @@ namespace GameLibrary
                 c < 0)
 
             {
-                return ((short)ErrorCode.Denied, $"Index is out of range. Row:{r}, Column: {c}");
+                return ((short)ErrorCode.Denied, $"Index is out of range. Row:{r}, Column: {c}",false);
             }
             else if (MatchOver)
             {
-                return ((short)ErrorCode.MatchIsOver, "Match is over");
+                return ((short)ErrorCode.MatchIsOver, "Match is over",true);
             }
             else if (GameGrid[r, c] != Mark.None)
             {
-                return ((short)ErrorCode.TrayIstaken, "tray is taken");
+                return ((short)ErrorCode.TrayIstaken, "tray is taken",false);
             }
-            return ((short)ErrorCode.Success, "Success");
+            return ((short)ErrorCode.Success, "Success",false);
         }
-        public (short ErrorCode, string ErrorMessage) MakeMove(int r, int c)
+        public (short ErrorCode, string ErrorMessage,bool matchend) MakeMove(int r, int c)
         {
 
             var canMakeMove = CanMakeMove(r, c);

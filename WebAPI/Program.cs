@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using WebAPI;
 using Newtonsoft.Json;
+using GameLibrary;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IDatabaseConnection, NpgsqlConnector>();
 builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
+builder.Services.AddSingleton<IMatch, Match>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
@@ -52,6 +54,7 @@ if (app.Environment.IsDevelopment())
 
 }
 
+app.UseCors(MyAllowSpecificOrigins);
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/signalr"))
@@ -89,7 +92,7 @@ app.Use(async (context, next) =>
 
 app.MapHub<GameHub>("signalr");
 
-app.UseCors(MyAllowSpecificOrigins);
+
 
 //app.UseMiddleware<WebSocketsMiddleware>();
 app.UseAuthentication();

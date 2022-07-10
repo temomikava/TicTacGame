@@ -5,6 +5,7 @@ using System;
 using System.Data;
 using WebAPI.Core.Interface;
 using WebAPI.Models;
+using GameLibrary;
 
 namespace WebAPI.Core.Services
 {
@@ -12,9 +13,10 @@ namespace WebAPI.Core.Services
     {
         private readonly IConfiguration _configuration;
         private readonly string _connectionString;
-
-        public NpgsqlConnector(IConfiguration config)
+        IMatch _match;
+        public NpgsqlConnector(IConfiguration config,IMatch match)
         {
+            _match = match;            
             _configuration = config;
             _connectionString = _configuration.GetConnectionString("myConnection").Trim();
         }
@@ -25,18 +27,18 @@ namespace WebAPI.Core.Services
                 try
                 {
                     var cmd = new NpgsqlCommand("authorize", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.Add("_sessionid", NpgsqlDbType.Uuid); 
+                    cmd.Parameters.Add("_sessionid", NpgsqlDbType.Uuid);
                     cmd.Parameters["_sessionid"].Value = sessionId;
 
                     connection.Open();
 
                     var id = cmd.ExecuteScalar();
-                   
+
                     if (id is DBNull)
-                    return -1;
-                        return (int)id;
-                    
-                    
+                        return -1;
+                    return (int)id;
+
+
                 }
                 catch (Exception)
                 {
@@ -47,7 +49,7 @@ namespace WebAPI.Core.Services
         public (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
-            { 
+            {
                 try
                 {
                     var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure };
@@ -56,8 +58,8 @@ namespace WebAPI.Core.Services
                     cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
                     connection.Open();
                     var sessionId = (Guid?)cmd.ExecuteScalar();
-                    
-                    return (1,"done", sessionId);
+
+                    return (1, "done", sessionId);
                 }
 
                 catch (Exception e)
@@ -78,11 +80,11 @@ namespace WebAPI.Core.Services
                     cmd.Parameters.AddWithValue("_lastname", registration.LastName);
                     cmd.Parameters.AddWithValue("_username", registration.UserName);
                     cmd.Parameters.AddWithValue("_password", registration.Password);
-                    if (registration.FirstName.Length<3)
+                    if (registration.FirstName.Length < 3)
                     {
                         return (0, "firstname must include minimum 3 symbols");
                     }
-                    if (registration.LastName.Length<3)
+                    if (registration.LastName.Length < 3)
                     {
                         return (0, "lastname must include minimum 3 symbols");
                     }
@@ -98,7 +100,7 @@ namespace WebAPI.Core.Services
                     connection.Open();
                     cmd.ExecuteNonQuery();
 
-                    return (0, "done");
+                    return (1, "done");
                 }
 
                 catch (Exception e)
@@ -107,69 +109,145 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        public (int Error, string ErrorMessage) CreateMatch(Matchup match)
+        public (int ErrorCode, string ErrorMessage,int matchId) MatchStart(IMatch game)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 try
                 {
-                    var cmd = new NpgsqlCommand("create_match", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_createdat", match.CreatedAt);
-                    cmd.Parameters.AddWithValue("_stateid", match.StateId);
-                    cmd.Parameters.AddWithValue("_points", match.Points);
-                    cmd.Parameters.AddWithValue("_boardsize", match.BoardSize);
+                    using (var cmd = new NpgsqlCommand("match_start", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_gameid", game.Id);
+                        cmd.Parameters.AddWithValue("_startedat", DateTime.Now);
+                        var matchid=cmd.ExecuteScalar();
+                        return (-1, "success", (int)matchid);
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    return (-1, "fail", -1);
+                }
+            }
+
+        }
+        public (int ErrorCode, string ErrorMessage) MatchEnd(IMatch match)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("match_end", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_matchid", _match.Id);
+                        cmd.Parameters.AddWithValue("_finishedat",match.FinishedAt);
+                        cmd.Parameters.AddWithValue("_winnerid",match.Winner_Player_id);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
+                        return (1, "success");
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    return (-1, "fail");
+                }
+            }
+
+        }
+
+        public (int ErrorCode, string ErrorMessage) JoinToGame(IMatch game)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("join_game", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_gameid",game.Id);
+                        cmd.Parameters.AddWithValue("_startedat", game.StartedAt);
+                        cmd.Parameters.AddWithValue("_stateid", game.StateId);
+                        cmd.Parameters.AddWithValue("_playertwoid", game.PlayerTwoID);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    return (1, "success");
+                    
+                }
+                catch (Exception)
+                {
+
+                    return (-1, "join to game failed");
+                }
+            }
+        }
+        public (int ErrorCode, string ErrorMessage, int GameId) SaveGameToDb(IMatch game)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var cmd = new NpgsqlCommand("create_game", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("_createdat", game.CreatedAt);
+                    cmd.Parameters.AddWithValue("_stateid", game.StateId);
+                    cmd.Parameters.AddWithValue("_scoretarget", game.TargetScore);
+                    cmd.Parameters.AddWithValue("_boardsize", game.BoardSize);
+                    cmd.Parameters.AddWithValue("_playeroneid", game.PlayerOneID);
                     connection.Open();
-                    cmd.ExecuteNonQuery();
+                    var id = cmd.ExecuteScalar();
 
-                    return (0, "done");
+                    return (1, "done", (int)id);
                 }
                 catch (Exception e)
                 {
-                    return (-1, e.Message);
+                    return (-1, e.Message, -1);
                 }
             }
         }
-        public List<Matchup> GetAllMatches()
+        public List<IMatch> GetGames()
         {
-            List<Matchup> output=new List<Matchup>();
+            List<IMatch> output = new List<IMatch>();
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 try
                 {
-                    using (var cmd = new NpgsqlCommand("getallmatches", connection) { CommandType = CommandType.StoredProcedure })
+                    using (var cmd = new NpgsqlCommand("getallgames", connection) { CommandType = CommandType.StoredProcedure })
                     {
                         connection.Open();
                         NpgsqlDataReader reader = cmd.ExecuteReader();
                         while (reader.Read())
                         {
-                            Matchup match = new Matchup()
-                            {
-                                Id = (int)reader["_id"],
-                                //reader.GetInt32(0),
-                                StateId = (int)reader["_state_id"],
-                                BoardSize = (int)reader["_board_size"],
-                                Points = (int)reader["_points"]
-                            };
-                            output.Add(match);
+                            //IMatch match = new Match((int)reader["_board_size"]);
+                            //match.Id = (int)reader["_id"];
+                            //match.StateId= (int)reader["_state_id"];
+                            //match.TargetScore= (int)reader["_points"];
+                            _match.Id = (int)reader["_id"];
+                            _match.StateId = (int)reader["_state_id"];
+                            _match.BoardSize = (int)reader["_board_size"];
+                            _match.TargetScore = (int)reader["_points"];
+                            output.Add(_match);
 
                         }
-                        
+
                     }
                 }
                 catch (Exception)
                 {
 
-                    throw;
+                    return null;
                 }
             }
             return output;
         }
-        public (int Error, string ErrorMessage) StartMatch(Matchup match)
-        {
-            GameLibrary.Match startGame = new GameLibrary.Match();
-            return startGame.MakeMove(2, 1);
-            
-        }
-        
+        //public (int Error, string ErrorMessage) StartGame(Game game)
+        //{
+        //    GameLibrary.Game startGame = new GameLibrary.Game();
+        //    return startGame.MakeMove(2, 1);
+
+        //}
+
     }
 }
