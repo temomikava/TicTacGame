@@ -2,14 +2,17 @@
 
 namespace GameLibrary
 {
-    public class Match:Game,IMatch
+    public class Match:Game
     {
-        public Mark[,] GameGrid { get;  set; }
+        public new int  Id { get; set; }
+        public new int StateId { get; set; }
+        public int WinnerId { get; set; }
+        public int GameId { get; set; }
         public Mark CurrentPlayer { get;  set; } = Mark.X;
         public int TurnsPassed { get;  set; } = 0;
         public bool MatchOver { get;  set; } = false;
-        public WinInfo WinInfo { get;  set; }
-        public MatchResult MatchResult { get;  set; }
+        public WinInfo WinInfo { get; set; } = new();
+        public MatchResult MatchResult { get;  set; }=new();
 
         //public event Action<int, int> MoveMade;
         //public event Action<MatchResult> GameEnded;
@@ -88,7 +91,7 @@ namespace GameLibrary
 
             return false;
         }
-        private (short ErrorCode, string ErrorMessage, bool matchend) CanMakeMove(int r, int c)
+        private (short ErrorCode, string ErrorMessage) CanMakeMove(int r, int c)
         {
             if (r > GameGrid.GetLength(0) - 1 ||
                 r < 0 ||
@@ -96,19 +99,19 @@ namespace GameLibrary
                 c < 0)
 
             {
-                return ((short)ErrorCode.Denied, $"Index is out of range. Row:{r}, Column: {c}",false);
+                return ((short)ErrorCode.Denied, $"Index is out of range. Row:{r}, Column: {c}");
             }
             else if (MatchOver)
             {
-                return ((short)ErrorCode.MatchIsOver, "Match is over",true);
+                return ((short)ErrorCode.MatchIsOver, "Match is over");
             }
             else if (GameGrid[r, c] != Mark.None)
             {
-                return ((short)ErrorCode.TrayIstaken, "tray is taken",false);
+                return ((short)ErrorCode.TrayIstaken, "tray is taken");
             }
-            return ((short)ErrorCode.Success, "Success",false);
+            return ((short)ErrorCode.Success, "Success");
         }
-        public (short ErrorCode, string ErrorMessage,bool matchend) MakeMove(int r, int c)
+        public  (short ErrorCode, string ErrorMessage)  MakeMove(int r, int c)
         {
 
             var canMakeMove = CanMakeMove(r, c);

@@ -7,6 +7,8 @@ using System.Security.Claims;
 using WebAPI;
 using Newtonsoft.Json;
 using GameLibrary;
+using Serilog;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +25,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IDatabaseConnection, NpgsqlConnector>();
 builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
-builder.Services.AddSingleton<IMatch, Match>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
@@ -41,6 +42,7 @@ builder.Services.AddCors(options =>
                       });
 });
 var app = builder.Build();
+app.UseCors(MyAllowSpecificOrigins);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -57,17 +59,18 @@ if (app.Environment.IsDevelopment())
 app.UseCors(MyAllowSpecificOrigins);
 app.Use(async (context, next) =>
 {
+    
     if (context.Request.Path.StartsWithSegments("/signalr"))
     {
-
         var sessionId = context.Request.Headers["Authorization"].ToString()?.Split()?.LastOrDefault();
         var isValidSessionId = Guid.TryParse(sessionId, out var validSessionId);
-
         if (!isValidSessionId)
         {
             context.Response.StatusCode = 401;
             return;
         }
+       
+        
 
         var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
         var id = dal.GetUserId(validSessionId);
@@ -80,13 +83,14 @@ app.Use(async (context, next) =>
         }
 
         var identity = new ClaimsIdentity();
-        identity.AddClaim(new Claim("session_id", sessionId));
+        identity.AddClaim(new Claim(ClaimTypes.Authentication, validSessionId.ToString()));
         identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
         context.User.AddIdentity(identity);
-        await next(context);
-    }
+        
 
-    await next(context);
+        await next();
+    }
+    await next();
 });
 
 
@@ -99,5 +103,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
 
 app.Run();
