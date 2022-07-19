@@ -7,17 +7,20 @@ namespace GameLibrary
         public new int  Id { get; set; }
         public new int StateId { get; set; }
         public int WinnerId { get; set; }
+        public new int PlayerOneScore { get; set; } = 0;
+        public new int PlayerTwoScore { get; set; } = 0;
         public int GameId { get; set; }
         public Mark CurrentPlayer { get;  set; } = Mark.X;
+        public int CurrentPlayerId { get; set; }
         public int TurnsPassed { get;  set; } = 0;
         public bool MatchOver { get;  set; } = false;
         public WinInfo WinInfo { get; set; } = new();
         public MatchResult MatchResult { get;  set; }=new();
 
-        //public event Action<int, int> MoveMade;
-        //public event Action<MatchResult> GameEnded;
-        //public event Action GameRestarted;
-       
+        public static event Action<int, int> MoveMade;
+        public static event Action<MatchResult> MatchEnded;
+        public static event Action MatchRestarted;
+
         private bool IsGridFull()
         {
             return TurnsPassed == GameGrid.Length;
@@ -27,6 +30,7 @@ namespace GameLibrary
         {
            
             CurrentPlayer = CurrentPlayer == Mark.X ? Mark.O : Mark.X;
+            CurrentPlayerId =CurrentPlayerId== PlayerOne.Id ? PlayerTwo.Id : PlayerOne.Id;
         }
 
         private bool AreSquaresMarked((int, int)[] squares, Mark player)
@@ -126,13 +130,14 @@ namespace GameLibrary
             {
                 MatchOver = true;
                 FinishedAt = DateTime.Now;
-                //MoveMade?.Invoke(r, c);
-                //GameEnded?.Invoke(MatchResult);
+                SwitchPlayer();
+                MoveMade?.Invoke(r, c);
+                MatchEnded?.Invoke(MatchResult);
             }
             else
             {
                 SwitchPlayer();
-                //MoveMade?.Invoke(r, c);
+                MoveMade?.Invoke(r, c);
             }
             return (canMakeMove);
         }
@@ -143,7 +148,7 @@ namespace GameLibrary
             CurrentPlayer = Mark.X;
             TurnsPassed = 0;
             MatchOver = false;
-            //GameRestarted?.Invoke();
+            MatchRestarted?.Invoke();
         }
 
 

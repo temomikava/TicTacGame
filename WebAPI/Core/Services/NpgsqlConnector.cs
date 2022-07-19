@@ -67,6 +67,117 @@ namespace WebAPI.Core.Services
                 }
             }
         }
+        public Mark[,] FillGrid(Match match)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                List<Move>moves=new List<Move>();
+                try
+                {
+                    var cmd = new NpgsqlCommand("getmovesbymatchid", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("_matchid", match.Id);
+                    var game = GetGameByID(match.GameId);
+
+                    connection.Open();
+                    NpgsqlDataReader reader=cmd.ExecuteReader();
+                    if (!reader.HasRows)
+                    {
+                        return new Mark[game.BoardSize,game.BoardSize];
+                    }
+                    while (reader.Read())
+                    {
+                        Move move = new Move();
+
+                        move.PlayerId = (int)reader["player_id"];
+                        move.MatchId = (int)reader["match_id"];
+                        move.RowCoordinate = (int)reader["row_coordinate"];
+                        move.ColumnCoordinate = (int)reader["column_coordinate"];
+                        moves.Add(move);
+                    }
+                    Mark[,]grid=new Mark[game.BoardSize,game.BoardSize];
+                    var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id);
+                    var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id);
+                    foreach (var coordinate in playerOneMoves)
+                    {
+                        grid[coordinate.RowCoordinate, coordinate.ColumnCoordinate] = Mark.X;
+                    }
+                    foreach (var coordinate in playerTwoMoves)
+                    {
+                        grid[coordinate.RowCoordinate, coordinate.ColumnCoordinate] = Mark.O;
+                    }
+                    return grid;
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+        
+        public void MakeMove(Match match,int r, int c)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var cmd = new NpgsqlCommand("makemove", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("_playerid", match.CurrentPlayerId==match.PlayerOne.Id? match.PlayerTwo.Id:match.PlayerOne.Id);
+                    cmd.Parameters.AddWithValue("_matchid", match.Id);
+                    cmd.Parameters.AddWithValue("_rowcoordinate", r);
+                    cmd.Parameters.AddWithValue("_columncoordinate", c);
+                    cmd.Parameters.AddWithValue("_turnspassed", match.TurnsPassed);
+                    cmd.Parameters.AddWithValue("_currentplayerid", match.CurrentPlayerId);
+                    connection.Open();
+                    cmd.ExecuteNonQuery();
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+        public Match GetActiveMatch(int gameId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                var activeMatch=new Match();
+                try
+                {
+                    var cmd = new NpgsqlCommand("get_active_matches", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("_game_id", gameId);
+                    connection.Open();
+                    NpgsqlDataReader reader = cmd.ExecuteReader();
+                    if (!reader.HasRows)
+                    {
+                        return null;
+                    }
+                    while (reader.Read())
+                    {
+                        activeMatch.Id = (int)reader["id"];
+                        activeMatch.GameId = (int)reader["gameid"];
+                        activeMatch.TurnsPassed = (int)reader["turnspassed"];
+                        activeMatch.CurrentPlayerId = (int)reader["currentplayerid"];
+                        activeMatch.StartedAt = (DateTime)reader["started_at"];
+                        activeMatch.MatchOver = (bool)reader["matchover"];
+                    }
+                    
+                    
+                    return activeMatch;
+                }
+                catch (Exception)
+                {
+
+                    return null;
+                }
+            }
+
+        }
+
 
         public (int Error, string ErrorMessage) Registration(RegistrationModel registration)
         {
@@ -108,32 +219,34 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        public (int ErrorCode, string ErrorMessage) MakeMove(Move move)
+        
+        public (int ErrorCode, string ErrorMessage) GameStart(int gameId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 try
                 {
-                    using (var cmd = new NpgsqlCommand("makemove", connection) { CommandType = CommandType.StoredProcedure })
+                    using (var cmd = new NpgsqlCommand("gamestart", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_playerid",move.PlayerId);
-                        cmd.Parameters.AddWithValue("_rowcoordinate",move.RowCoordinate);
-                        cmd.Parameters.AddWithValue("_columncoordinate", move.ColumnCoordinate);
-                        cmd.Parameters.AddWithValue("_matchid", move.MatchId);
+                        cmd.Parameters.AddWithValue("_gameid",gameId);
+                        cmd.Parameters.AddWithValue("_startedat", DateTime.Now);
+                        cmd.Parameters.AddWithValue("_stateid", (int)StateType.Started);
                         connection.Open();
-                        cmd.ExecuteNonQuery();
-                        return (1, "success");
+                        cmd.ExecuteNonQuery ();
+                        return(1, "success");
                     }
 
                 }
                 catch (Exception)
                 {
-                    return (-1, "fail");
+
+                    throw;
                 }
             }
 
         }
-        public (int ErrorCode, string ErrorMessage,int matchId) MatchStart(Match match)
+
+        public (int ErrorCode, string ErrorMessage, int matchId) MatchStart(Match match)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -144,7 +257,9 @@ namespace WebAPI.Core.Services
                         cmd.Parameters.AddWithValue("_gameid", match.GameId);
                         cmd.Parameters.AddWithValue("_stateid", match.StateId);
                         cmd.Parameters.AddWithValue("_startedat", DateTime.Now);
-                        var matchid=cmd.ExecuteScalar();
+                        cmd.Parameters.AddWithValue("_currentplayerid", match.CurrentPlayerId);
+                        connection.Open();
+                        var matchid = cmd.ExecuteScalar();
                         return (1, "success", (int)matchid);
                     }
 
@@ -152,37 +267,66 @@ namespace WebAPI.Core.Services
                 catch (Exception)
                 {
 
-                    return (-1, "fail", -1);
+                    throw;
                 }
             }
 
         }
         public (int ErrorCode, string ErrorMessage) MatchEnd(Match match)
         {
-            //    using (var connection = new NpgsqlConnection(_connectionString))
-            //    {
-            //        try
-            //        {
-            //            using (var cmd = new NpgsqlCommand("match_end", connection) { CommandType = CommandType.StoredProcedure })
-            //            {
-            //                cmd.Parameters.AddWithValue("_matchid", match.Id);
-            //                cmd.Parameters.AddWithValue("_finishedat",match.FinishedAt);
-            //                cmd.Parameters.AddWithValue("_winnerid",match.Winner_Player_id);
-            //                connection.Open();
-            //                cmd.ExecuteNonQuery();
-            //                return (1, "success");
-            //            }
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("match_end", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_matchid", match.Id);
+                        cmd.Parameters.AddWithValue("_gameid",match.GameId);
+                        cmd.Parameters.AddWithValue("_playeronescore", match.PlayerOneScore);
+                        cmd.Parameters.AddWithValue("_playertwoscore", match.PlayerTwoScore);
+                        cmd.Parameters.AddWithValue("_finishedat", match.FinishedAt);
+                        cmd.Parameters.AddWithValue("_winnerid", match.WinnerId);
+                        cmd.Parameters.AddWithValue("_stateid", (int)StateType.Finishid);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
+                        return (1, "success");
+                    }
 
-            //        }
-            //        catch (Exception)
-            //        {
+                }
+                catch (Exception)
+                {
 
-            //            return (-1, "fail");
-            //        }
-            //    }
-                 return (1, "success");
+                    return (-1, "fail");
+                }
             }
-            public (int ErrorCode, string ErrorMessage) GameEnd(Game game)
+            return (1, "success");
+        }
+        public (int ErrorCode, string ErrorMessage) JoinToGame(int gameId, int playerId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("jointogame", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_gameid",gameId);
+                        cmd.Parameters.AddWithValue("_playerid", playerId);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
+                        return(1, "success");
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+
+        public (int ErrorCode, string ErrorMessage) GameEnd(Game game)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -193,9 +337,9 @@ namespace WebAPI.Core.Services
                         cmd.Parameters.AddWithValue("_gameid", game.Id);
                         cmd.Parameters.AddWithValue("_finishedat", DateTime.Now);
                         cmd.Parameters.AddWithValue("_stateid", game.StateId);
-                        cmd.Parameters.AddWithValue("_playeronescore", game.PlayerOneScore);
-                        cmd.Parameters.AddWithValue("_playertwoscore", game.PlayerTwoScore);
                         cmd.Parameters.AddWithValue("_winnerid", game.Winner_Player_id);
+                        connection.Open();
+                        cmd.ExecuteNonQuery();
                         return (1, "success");
                     }
 
@@ -217,9 +361,9 @@ namespace WebAPI.Core.Services
                 try
                 {
                     var cmd = new NpgsqlCommand("get_username", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_id",userId);
+                    cmd.Parameters.AddWithValue("_id", userId);
                     connection.Open();
-                    var username=cmd.ExecuteScalar();
+                    var username = cmd.ExecuteScalar();
                     return (1, "success", username.ToString());
                 }
                 catch (Exception)
@@ -228,33 +372,8 @@ namespace WebAPI.Core.Services
                 }
             }
 
-        }      
-        public (int ErrorCode, string ErrorMessage) GameStart(Game game)
-        {
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                try
-                {
-                    using (var cmd = new NpgsqlCommand("gamestart", connection) { CommandType = CommandType.StoredProcedure })
-                    {
-                        cmd.Parameters.AddWithValue("_gameid", game.Id);
-                        cmd.Parameters.AddWithValue("_startedat", game.StartedAt);
-                        cmd.Parameters.AddWithValue("_stateid", game.StateId);
-                        cmd.Parameters.AddWithValue("_playertwoid", game.PlayerTwo.Id);
-                        connection.Open();
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    return (1, "success");
-
-                }
-                catch (Exception)
-                {
-
-                    return (-1, "join to game failed");
-                }
-            }
         }
+        
 
         public (int ErrorCode, string ErrorMessage, int GameId) GameCreate(Game game)
         {
@@ -279,6 +398,79 @@ namespace WebAPI.Core.Services
                 }
             }
         }
+        public Match GetMatchById(int matchId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                var match = new Match();
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("get_match_by_id", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_match_id",matchId);
+                        connection.Open();
+                        NpgsqlDataReader reader=cmd.ExecuteReader();
+                        match.Id = (int)reader["_id"];
+                        match.StateId = (int)reader["_started_at"];
+                        match.FinishedAt = reader["_finished_at"] is DBNull ? null : (DateTime)reader["_finished_at"];
+                        match.WinnerId = reader["_winnerid"] is DBNull ? 0 : (int)reader["_winnerid"];
+                        match.StateId= (int)reader["_state_id"];
+                        match.GameId= (int)reader["_game_id"];
+                        match.TurnsPassed = reader["_turnspassed"] is DBNull ? 0 : (int)reader["_turnspassed"];
+                        match.CurrentPlayerId = (int)reader["_currentplayerid"];
+                        match.MatchOver=(bool)reader["_matchover"];
+                        return match;
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+        public Game GetGameByID(int gameId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var game = new Game();
+                    using (var cmd = new NpgsqlCommand("get_game_by_id", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_game_id", gameId);
+                        connection.Open();
+                        NpgsqlDataReader reader = cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            game.Id = (int)reader["_id"];
+                            game.CreatedAt = (DateTime)reader["_created_at"];
+                            game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
+                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_two_id"] };
+                            game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
+                            game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
+                            game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Username;
+
+                            game.StateId = (int)reader["_state_id"];
+                            game.BoardSize = (int)reader["_board_size"];
+                            game.TargetScore = (int)reader["_target_score"];
+                            game.PlayerOne=reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
+                        }
+                        
+                        return game;
+
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+        }
         public List<Game> GetGames()
         {
             List<Game> output = new List<Game>();
@@ -293,50 +485,41 @@ namespace WebAPI.Core.Services
                         while (reader.Read())
                         {
                             Game game = new Game();
-                            //match.Id = (int)reader["_id"];
-                            //match.StateId= (int)reader["_state_id"];
-                            //match.TargetScore= (int)reader["_points"];
-                            if ((int)reader["_state_id"]==1)
-                            {
-                                game.Id = (int)reader["_id"];
-                                game.CreatedAt = (DateTime)reader["_created_at"];
-                                game.StateId = (int)reader["_state_id"];
-                                game.BoardSize = (int)reader["_board_size"];
-                                game.TargetScore = (int)reader["_target_score"];
-                                game.PlayerOne.Id = (int)reader["_player_one_id"];
-                                game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
-                                output.Add(game);
 
-                            }
-                            else if((int)reader["_state_id"] == 2)
-                            {
-                                game.Id = (int)reader["_id"];
-                                game.StartedAt = (DateTime)reader["_started_at"];
-                                game.StateId = (int)reader["_state_id"];
-                                game.PlayerOne.Id = (int)reader["_player_one_id"];
-                                game.PlayerTwo.Id = (int)reader["_player_two_id"];
-                                game.BoardSize = (int)reader["_board_size"];
-                                game.TargetScore = (int)reader["_target_score"];
-                                game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
-                                game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Username;
-                                output.Add(game);
 
-                            }
+                            game.Id = (int)reader["_id"];
+                            game.CreatedAt = (DateTime)reader["_created_at"];
+                            game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
+                            game.PlayerTwo.Id = reader["_player_two_id"] is DBNull ? 0 : (int)reader["_player_two_id"];
+                            game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
+                            game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
+                            game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Username;
+
+                            game.StateId = (int)reader["_state_id"];
+                            game.BoardSize = (int)reader["_board_size"];
+                            game.TargetScore = (int)reader["_target_score"];
+                            game.PlayerOne.Id = (int)reader["_player_one_id"];
+                            game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
+                            output.Add(game);
+
+
 
 
                         }
 
                     }
-                    return output;  
+                    return output;
                 }
                 catch (Exception ex)
                 {
 
-                    throw new Exception(ex.Message+" problem with load games");
+                    throw new Exception(ex.Message + " problem with load games");
                 }
             }
         }
-        //public (int Error, string ErrorMessage) StartGame(Game game)
+
+       
+        //public (int Error, string ErrorMessage) StartGame(Game mainGame)
         //{
         //    GameLibrary.Game startGame = new GameLibrary.Game();
         //    return startGame.MakeMove(2, 1);

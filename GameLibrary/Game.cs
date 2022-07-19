@@ -16,10 +16,10 @@ namespace GameLibrary
         public DateTime? StartedAt { get; set; } = null;
         public DateTime? FinishedAt { get; set; } = null;
         public int StateId { get; set; }
-        public Player PlayerOne { get; set; }=new Player();
-        public Player PlayerTwo { get; set; } = new Player();
-        public int PlayerOneScore { get; set; } = 0;
-        public int PlayerTwoScore { get; set; } = 0;
+        public Player PlayerOne { get; set; }
+        public Player PlayerTwo { get; set; }
+        public int PlayerOneScore { get; set; } 
+        public int PlayerTwoScore { get; set; } 
         public int Winner_Player_id { get; set; }
         public int TargetScore { get; set; }
         public int BoardSize { get; set; }

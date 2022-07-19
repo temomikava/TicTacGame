@@ -10,14 +10,15 @@ using WebAPI.Core.Services;
 using WebAPI.Models;
 using GameLibrary;
 using GameLibrary.Enums;
+using GameLibrary.Helpers;
 
 namespace WebAPI.SignalR
 {
 
     public class GameHub : Hub
     {
-        Game game;
-        Match match;
+        Game mainGame;
+        Match mainMatch;
         private IDatabaseConnection _connection;
         public GameHub(IDatabaseConnection connection)
         {
@@ -38,7 +39,7 @@ namespace WebAPI.SignalR
             {
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
-            var games = _connection.GetGames();
+            //var games = _connection.GetGames();
             //await Clients.All.SendAsync("getallgame", _games);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
@@ -58,182 +59,128 @@ namespace WebAPI.SignalR
             await base.OnDisconnectedAsync(exception);
         }
 
-        public async Task SendAllGameToCaller()
-        {
-            var games = _connection.GetGames();
-            await Clients.Caller.SendAsync("getallgame", games);
-        }
+
         public async Task CreateGame(int boardSize, int scoreTarget)
         {
-            game = new Game();
-            var id = Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
-            string errorMessage = "success";
-            int errorCode = 1;
-            if (boardSize < 3)
-            {
-                errorMessage = "board size cannot be less than 3";
-                errorCode = -1;
-            }
-            else if (scoreTarget < 1)
-            {
-                errorMessage = "scoretarget cannot be less than 1";
-                errorCode = -1;
-            }
-            else
-            {
-
-                game.PlayerOne.Id = int.Parse(id);
-                game.CreatedAt = DateTime.Now;
-                game.StateId = (int)StateType.Created;
-                game.TargetScore = scoreTarget;
-                game.BoardSize = boardSize;
-                var saveGameToDb = _connection.GameCreate(game);
-                if (saveGameToDb.ErrorCode == 1)
-                {
-                    await SendGamesToAllClient();
-                }
-                else
-                {
-                    errorMessage = "my bad";
-                    errorCode = -1;
-                }
-            }
-            await Clients.Caller.SendAsync("ongamecreate", errorMessage, errorCode);
-        }
-        private async Task SendGamesToAllClient()
-        {
-            List<Game> games = _connection.GetGames();
-            await Clients.All.SendAsync("getgames", games);
+            int playerOneId= int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
+            mainGame = new Game();
+            mainGame.CreatedAt = DateTime.Now;
+            mainGame.BoardSize = boardSize;
+            mainGame.TargetScore = scoreTarget;
+            mainGame.StateId = (int)StateType.Created;
+            mainGame.PlayerOne = new Player { Id=playerOneId};
+            mainGame.Id=_connection.GameCreate(mainGame).GameId;
+            await Clients.Caller.SendAsync("ongamecreate", "wait for oponent");
+            //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
+            //mainMatch = waitingForOponent.Waiting();
 
         }
 
         public async Task JoinToGame(int gameId)
         {
-            var id = Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
+            int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
+            _connection.JoinToGame(gameId, playerTwoId);
+            await GameStart(gameId);
 
-            var games = _connection.GetGames();
-            var waiterGames = games.Where(x => x.StateId == (int)StateType.Created);
-            if (waiterGames.All(x => x.Id != gameId))
+        }
+        public async Task GameStart(int gameId)
+        {
+            _connection.GameStart(gameId);
+            await MatchStart(gameId);
+        }
+        private async Task MatchStart(int gameId)
+        {
+            var game=_connection.GetGameByID(gameId);
+            mainMatch=new Match();
+            mainMatch.GameId=gameId;
+            mainMatch.StateId = (int)StateType.Started;
+            mainMatch.CurrentPlayerId=game.PlayerOne.Id;
+            mainMatch.StartedAt = DateTime.Now;
+            _connection.MatchStart(mainMatch);
+
+        }
+        
+        public async Task MakeMove(int gameId, int r, int c)
+        {
+            Match.MoveMade += Match_MoveMade;
+            //Match.MatchRestarted += Match_MatchRestarted;
+            Match.MatchEnded += Match_MatchEnded;
+            mainGame = _connection.GetGameByID(gameId);
+            mainMatch=_connection.GetActiveMatch(gameId);
+            mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id };
+            mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id };
+            mainMatch.GameGrid = _connection.FillGrid(mainMatch);
+            if (mainMatch.CurrentPlayerId!= int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value))
             {
-                await Clients.Caller.SendAsync("ongamejoin", "here is no waiter game for this id");
+                await Clients.Caller.SendAsync("onmovemade", "wait for your turn",-1);
                 return;
             }
             else
             {
-                var game = waiterGames.First(game => game.Id == gameId);
-                game.StartedAt = DateTime.Now;
-                game.StateId = (int)StateType.Started;
-                game.PlayerTwo.Id = int.Parse(id);
-                var updateGamesToDb = _connection.GameStart(game);
-                await MatchStart();
-                await Clients.Users(game.PlayerOne.Id.ToString(), game.PlayerTwo.Id.ToString()).SendAsync(game.PlayerOne.UserName + "`s Turn");
-                await SendGamesToAllClient();
-
+                var makeMove=mainMatch.MakeMove(r, c);
+                Match.MoveMade -= Match_MoveMade;
+                Match.MatchEnded -= Match_MatchEnded;
+                return;
             }
 
+            
         }
-        public async Task MakeMove(int r, int c)
+
+        private async void Match_MatchEnded(MatchResult obj)
         {
-            if (match.MatchOver)
+            if (obj.Winner==Mark.X)
             {
-               await Clients.Caller.SendAsync("onmovemade", -1, "matchisover");
-               return;
+                mainMatch.WinnerId = mainGame.PlayerOne.Id;
+                mainGame.PlayerOneScore++;
+                mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
+                _connection.MatchEnd(mainMatch);
             }
-            if (match.CurrentPlayer == Mark.X &&
-                game.PlayerOne.Id == int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value))
+            else if (obj.Winner==Mark.O)
             {
+                mainMatch.WinnerId = mainGame.PlayerTwo.Id;
+                mainGame.PlayerTwoScore++;
+                mainMatch.PlayerTwoScore = mainGame.PlayerTwoScore;
+                _connection.MatchEnd(mainMatch);
                 
-                
-                var movemade = match.MakeMove(r, c);
-
-                if (movemade.ErrorCode == (int)ErrorCode.Success)
-                {
-                    Move move = new Move();
-                    move.PlayerId = game.PlayerOne.Id;
-                    move.MatchId = match.Id;
-                    move.RowCoordinate = r;
-                    move.ColumnCoordinate = c;
-                    _connection.MakeMove(move);
-
-                    if (!match.MatchOver)
-                    {
-                        await Clients.Users(game.PlayerOne.Id.ToString(), game.PlayerTwo.Id.ToString()).SendAsync(game.PlayerTwo.UserName + "`s Turn");
-                    }
-                    else
-                    {                       
-                           await MatchEnd();                      
-                    }
-                    
-                }
-                else
-                {
-                    await Clients.Caller.SendAsync("onmovemade", movemade.ErrorCode, movemade.ErrorMessage);
-
-                    return;
-                }
-
-            }
-            else if (match.CurrentPlayer == Mark.O &&
-                game.PlayerTwo.Id == int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value))
-            {
-                if (match.MatchOver)
-                {
-                    await Clients.Caller.SendAsync("onmovemade", -1, "matchisover");
-                    return;
-                }
-                
-                match.MakeMove(r, c);
 
             }
             else
             {
-                await Clients.Caller.SendAsync("onmovemade", -1, "wait for your turn");
-                return;
+                mainMatch.WinnerId = -1;
+                _connection.MatchEnd(mainMatch);
+
             }
-
-
-
-            //MatchStart();
-
+            if (mainGame.TargetScore!=mainGame.PlayerOneScore && mainGame.TargetScore!=mainGame.PlayerTwoScore)
+            {
+               await MatchStart(mainGame.Id);
+            }
+            else
+            {
+                mainGame.Winner_Player_id = mainGame.PlayerOneScore > mainGame.PlayerTwoScore ? mainGame.PlayerOne.Id : mainGame.PlayerTwo.Id;
+                mainGame.StateId = 3;
+                mainGame.Winner_Player_id = mainMatch.WinnerId;
+                _connection.GameEnd(mainGame);
+            }
         }
-        private async Task MatchStart()
+
+        private void Match_MatchRestarted()
         {
-            match = new Match();
-            match.GameGrid = new Mark[game.BoardSize, game.BoardSize];
-            match.StateId = (int)StateType.Started;
-            match.GameId = game.Id;
-            match.Id = _connection.MatchStart(match).matchId;
-            game.MatchList.Add(match);
-
+            throw new NotImplementedException();
         }
+
+        private void Match_MoveMade(int r, int c)
+        {
+            _connection.MakeMove(mainMatch, r, c);
+        }
+
         private async Task MatchEnd()
         {
-            match.WinnerId = match.CurrentPlayer == Mark.X ? game.PlayerOne.Id : match.CurrentPlayer == Mark.O ? game.PlayerTwo.Id : -1;
-            var targetscore = match.WinnerId == game.PlayerOne.Id ? ++game.PlayerOneScore : match.WinnerId == match.PlayerTwo.Id ? ++game.PlayerTwoScore : -1;
 
-            match.StateId = (int)StateType.Finishid;
-            match.FinishedAt = DateTime.Now;
-            _connection.MatchEnd(match);
-            if (targetscore != game.TargetScore)
-            {
-                await MatchStart();
-            }
-            else
-            {
-                await GameEnd(game);
-            }
         }
-        //public async Task GameStart(Game game)
-        //{
-        //await MatchStart();
-        //}
+
         public async Task GameEnd(Game game)
         {
-            game.Winner_Player_id = game.PlayerOneScore > game.PlayerOneScore ? game.PlayerOne.Id : game.PlayerTwo.Id;
-            game.FinishedAt = DateTime.Now;     
-            game.StateId = (int)StateType.Finishid;
-            
-            _connection.GameEnd(game);
+
         }
         public async Task<int> Notify(string messagge)
         {
