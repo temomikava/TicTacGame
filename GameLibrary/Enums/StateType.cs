@@ -2,6 +2,6 @@
 {
     public enum StateType
     {
-        Created=1, Started, Finishid, Canceled
+        Created=1, Started, Finished, Cancelled
     }
 }

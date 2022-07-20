@@ -21,6 +21,7 @@ namespace WebAPI.Core.Interface
         public Game GetGameByID(int gameId);
         public void MakeMove(Match match, int r, int c);
         public Mark[,] FillGrid(Match match);
+        public void Ondisconnected(int gameId);
 
 
 

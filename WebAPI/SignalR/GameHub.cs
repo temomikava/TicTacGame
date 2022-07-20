@@ -39,13 +39,37 @@ namespace WebAPI.SignalR
             {
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
-            //var games = _connection.GetGames();
-            //await Clients.All.SendAsync("getallgame", _games);
+            var games = _connection.GetGames();
+            await Clients.All.SendAsync("getallgame", games);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
+            var games= _connection.GetGames();
+            List<Game> connectedGames = new List<Game>();
+            var createdgames = games.Where(x => x.StateId == (int)StateType.Created && x.PlayerOne.Id == id);
+            var startedgames = games.Where(x => x.StateId == (int)StateType.Started && x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
+            foreach (var game in createdgames)
+            {
+                connectedGames.Add(game);
+            }
+            foreach (var game in startedgames)
+            {
+                connectedGames.Add(game);
+                var opponentId=id==game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
+                if (id==game.PlayerOne.Id)
+                {
+                    await Clients.User(opponentId.ToString()).SendAsync("ondisconnected", "opponent disconnected!");
+                }
+            }
+            foreach (var game in connectedGames)
+            {
+                _connection.Ondisconnected(game.Id);
+            }
+            var availableGames = _connection.GetGames();
+            await Clients.All.SendAsync("getallgame",availableGames);
+                //games.SingleOrDefault(x => x.StateId == (int)StateType.Started && x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
+          
             string connectionid = Context.User.Claims.First(x => x.Type == ClaimTypes.Authentication).Value;
             var connId = Context.ConnectionId;
             if (_users[id].Count > 1)
@@ -69,8 +93,9 @@ namespace WebAPI.SignalR
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id=playerOneId};
+            mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
             mainGame.Id=_connection.GameCreate(mainGame).GameId;
-            await Clients.Caller.SendAsync("ongamecreate", "wait for oponent");
+            await Clients.All.SendAsync("ongamecreate", mainGame);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
             //mainMatch = waitingForOponent.Waiting();
 
@@ -78,8 +103,10 @@ namespace WebAPI.SignalR
 
         public async Task JoinToGame(int gameId)
         {
+            
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var join = _connection.JoinToGame(gameId, playerTwoId);
+
             if (join.ErrorCode!=1)
 
             {
@@ -88,12 +115,17 @@ namespace WebAPI.SignalR
             }
             else
             {
-                await Clients.Caller.SendAsync("ongamejoin", 1, join.ErrorMessage);
+                mainGame = _connection.GetGameByID(gameId);
+
+                await Clients.Caller.SendAsync("ongamejoin", 1, mainGame.PlayerOne);
+                List<string>userids=new List<string> { mainGame.PlayerOne.Id.ToString(),mainGame.PlayerTwo.Id.ToString() };
+                await Clients.Users(userids).SendAsync("ongamejoin", mainGame.PlayerOne.UserName+"`s turn");
+                    //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
             }
             await GameStart(gameId);
 
         }
-        public async Task GameStart(int gameId)
+        private async Task GameStart(int gameId)
         {
             _connection.GameStart(gameId);
             await MatchStart(gameId);
@@ -135,13 +167,12 @@ namespace WebAPI.SignalR
             else
             {
                 var makeMove=mainMatch.MakeMove(r, c);
-                if (makeMove.ErrorCode!=1)
-                {
-                   await Clients.Caller.SendAsync("onmovemade", makeMove.ErrorMessage, makeMove.ErrorCode);
-                }
+                
+                await Clients.Caller.SendAsync("onmovemade", makeMove.ErrorMessage, makeMove.ErrorCode);
+                
+                
                 Match.MoveMade -= Match_MoveMade;
                 Match.MatchEnded -= Match_MatchEnded;
-                return;
             }
 
             
@@ -177,11 +208,14 @@ namespace WebAPI.SignalR
             }
             else
             {
-                mainGame.Winner_Player_id = mainGame.PlayerOneScore > mainGame.PlayerTwoScore ? mainGame.PlayerOne.Id : mainGame.PlayerTwo.Id;
                 mainGame.StateId = 3;
                 mainGame.Winner_Player_id = mainMatch.WinnerId;
                 _connection.GameEnd(mainGame);
             }
+        }
+        private void Match_MoveMade(int r, int c)
+        {
+            _connection.MakeMove(mainMatch, r, c);
         }
 
         private void Match_MatchRestarted()
@@ -189,31 +223,6 @@ namespace WebAPI.SignalR
             throw new NotImplementedException();
         }
 
-        private void Match_MoveMade(int r, int c)
-        {
-            _connection.MakeMove(mainMatch, r, c);
-        }
-
-        private async Task MatchEnd()
-        {
-
-        }
-
-        public async Task GameEnd(Game game)
-        {
-
-        }
-        public async Task<int> Notify(string messagge)
-        {
-            await Clients.All.SendAsync("ReceiveMessage", "from server " + messagge);
-            return 888;
-        }
-
-
-        //public string GetConnectionId() => Context.ConnectionId;
-        //public async Task AddToGroup(string groupName)
-        // =>    await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-
-
+                     
     }
 }
