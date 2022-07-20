@@ -56,24 +56,31 @@ if (app.Environment.IsDevelopment())
 
 }
 
+
+
+
+
+
 app.UseCors(MyAllowSpecificOrigins);
+Guid guid = new Guid();
 app.Use(async (context, next) =>
 {
-    
+
     if (context.Request.Path.StartsWithSegments("/signalr"))
     {
+        
         var sessionId = context.Request.Headers["Authorization"].ToString()?.Split()?.LastOrDefault();
         var isValidSessionId = Guid.TryParse(sessionId, out var validSessionId);
-        if (!isValidSessionId)
+        if (isValidSessionId)
         {
-            context.Response.StatusCode = 401;
-            return;
+            guid = validSessionId;
         }
-       
         
 
+
+
         var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
-        var id = dal.GetUserId(validSessionId);
+        var id = dal.GetUserId(guid);
 
 
         if (id == -1)
@@ -83,12 +90,14 @@ app.Use(async (context, next) =>
         }
 
         var identity = new ClaimsIdentity();
-        identity.AddClaim(new Claim(ClaimTypes.Authentication, validSessionId.ToString()));
         identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.Authentication, validSessionId.ToString()));
         context.User.AddIdentity(identity);
-        await next();
+        await next.Invoke();
+        return;
     }
-    
+    await next.Invoke();
+
 });
 
 

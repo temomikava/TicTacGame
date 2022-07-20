@@ -39,8 +39,8 @@ namespace WebAPI.SignalR
             {
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
-            //var games = _connection.GetGames();
-            //await Clients.All.SendAsync("getallgame", _games);
+            var games = _connection.GetGames();
+            await Clients.All.SendAsync("getallgame", games);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
