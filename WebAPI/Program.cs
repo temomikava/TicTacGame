@@ -86,11 +86,9 @@ app.Use(async (context, next) =>
         identity.AddClaim(new Claim(ClaimTypes.Authentication, validSessionId.ToString()));
         identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
         context.User.AddIdentity(identity);
-        
-
         await next();
     }
-    await next();
+    
 });
 
 

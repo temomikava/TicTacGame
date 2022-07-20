@@ -317,10 +317,10 @@ namespace WebAPI.Core.Services
                     }
 
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
 
-                    throw;
+                    return (-1, ex.Message);
                 }
             }
 

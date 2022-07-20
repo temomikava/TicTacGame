@@ -79,7 +79,17 @@ namespace WebAPI.SignalR
         public async Task JoinToGame(int gameId)
         {
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            _connection.JoinToGame(gameId, playerTwoId);
+            var join = _connection.JoinToGame(gameId, playerTwoId);
+            if (join.ErrorCode!=1)
+
+            {
+               await Clients.Caller.SendAsync("ongamejoin", -1,join.ErrorMessage );
+               return;
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("ongamejoin", 1, join.ErrorMessage);
+            }
             await GameStart(gameId);
 
         }
@@ -107,17 +117,28 @@ namespace WebAPI.SignalR
             Match.MatchEnded += Match_MatchEnded;
             mainGame = _connection.GetGameByID(gameId);
             mainMatch=_connection.GetActiveMatch(gameId);
+            if (mainMatch==null)
+            {
+               await Clients.Caller.SendAsync("onmovemade", "wait for oponent",-1);
+               return;
+            }
             mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id };
             mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id };
             mainMatch.GameGrid = _connection.FillGrid(mainMatch);
             if (mainMatch.CurrentPlayerId!= int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value))
             {
                 await Clients.Caller.SendAsync("onmovemade", "wait for your turn",-1);
+                Match.MoveMade -= Match_MoveMade;
+                Match.MatchEnded -= Match_MatchEnded;
                 return;
             }
             else
             {
                 var makeMove=mainMatch.MakeMove(r, c);
+                if (makeMove.ErrorCode!=1)
+                {
+                   await Clients.Caller.SendAsync("onmovemade", makeMove.ErrorMessage, makeMove.ErrorCode);
+                }
                 Match.MoveMade -= Match_MoveMade;
                 Match.MatchEnded -= Match_MatchEnded;
                 return;
