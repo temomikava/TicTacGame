@@ -79,11 +79,7 @@ namespace WebAPI.Core.Services
                     var game = GetGameByID(match.GameId);
 
                     connection.Open();
-                    NpgsqlDataReader reader=cmd.ExecuteReader();
-                    if (!reader.HasRows)
-                    {
-                        return new Mark[game.BoardSize,game.BoardSize];
-                    }
+                    NpgsqlDataReader reader=cmd.ExecuteReader();                    
                     while (reader.Read())
                     {
                         Move move = new Move();
@@ -95,16 +91,10 @@ namespace WebAPI.Core.Services
                         moves.Add(move);
                     }
                     Mark[,]grid=new Mark[game.BoardSize,game.BoardSize];
-                    var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id);
-                    var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id);
-                    foreach (var coordinate in playerOneMoves)
-                    {
-                        grid[coordinate.RowCoordinate, coordinate.ColumnCoordinate] = Mark.X;
-                    }
-                    foreach (var coordinate in playerTwoMoves)
-                    {
-                        grid[coordinate.RowCoordinate, coordinate.ColumnCoordinate] = Mark.O;
-                    }
+                    var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
+                    var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
+                    playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);
+                    playerTwoMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.O);                   
                     return grid;
 
                 }

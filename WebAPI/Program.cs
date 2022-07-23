@@ -94,6 +94,7 @@ app.Use(async (context, next) =>
         identity.AddClaim(new Claim(ClaimTypes.Authentication, validSessionId.ToString()));
         context.User.AddIdentity(identity);
         await next.Invoke();
+        return;
     }
     await next.Invoke();
 
