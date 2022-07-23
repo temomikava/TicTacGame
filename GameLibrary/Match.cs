@@ -27,9 +27,7 @@ namespace GameLibrary
         }
 
         private void SwitchPlayer()
-        {
-           
-            CurrentPlayer = CurrentPlayer == Mark.X ? Mark.O : Mark.X;
+        {           
             CurrentPlayerId =CurrentPlayerId== PlayerOne.Id ? PlayerTwo.Id : PlayerOne.Id;
         }
 

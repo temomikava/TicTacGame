@@ -481,13 +481,12 @@ namespace WebAPI.Core.Services
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
                             game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player () : new Player { Id= (int)reader["_player_two_id"] };
-                            if (game.PlayerTwo!=null)
+                            if (game.PlayerTwo.Id!=0)
                             {
                                 game.PlayerTwo=new Player { Id=game.PlayerTwo.Id,UserName=GetUsername(game.PlayerTwo.Id).Username};
                             }
                             game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
                             game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
-                            game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Username;
 
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];

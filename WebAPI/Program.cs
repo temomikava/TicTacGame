@@ -100,14 +100,13 @@ app.Use(async (context, next) =>
 
 });
 
-
 app.MapHub<GameHub>("signalr");
 
 
 
 //app.UseMiddleware<WebSocketsMiddleware>();
-app.UseAuthentication();
-app.UseAuthorization();
+//app.UseAuthentication();
+//app.UseAuthorization();
 
 app.MapControllers();
 
