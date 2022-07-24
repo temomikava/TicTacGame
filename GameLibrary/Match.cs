@@ -28,7 +28,7 @@ namespace GameLibrary
 
         private void SwitchPlayer()
         {           
-            CurrentPlayerId =CurrentPlayerId== PlayerOne.Id ? PlayerTwo.Id : PlayerOne.Id;
+            CurrentPlayerId =CurrentPlayerId== PlayerOne.Id ?PlayerTwo.Id : PlayerOne.Id;
         }
 
         private bool AreSquaresMarked((int, int)[] squares, Mark player)

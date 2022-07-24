@@ -1,16 +1,10 @@
 ﻿using GameLibrary;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using WebAPI.Core.Interface;
-using WebAPI.Core.Services;
-using WebAPI.Models;
-using GameLibrary;
 using GameLibrary.Enums;
-using GameLibrary.Helpers;
 using WebAPI.Requests;
 
 namespace WebAPI.SignalR
@@ -58,7 +52,7 @@ namespace WebAPI.SignalR
                 {
                     var opponentId = id == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
 
-                    await Clients.User(opponentId.ToString()).SendAsync("ongamecreate",-1, "opponent disconnected!");
+                    await Clients.User(opponentId.ToString()).SendAsync("ondisconnected",-1, "opponent disconnected!");
 
                 }
 
@@ -171,8 +165,8 @@ namespace WebAPI.SignalR
                await Clients.Caller.SendAsync("onmovemade", "wait for oponent",-1);
                return;
             }
-            //mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id };
-            //mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id };
+            mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id };
+            mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id };
             mainMatch.GameGrid = _connection.FillGrid(mainMatch);
             if (mainMatch.CurrentPlayerId!= int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value))
             {
@@ -181,7 +175,7 @@ namespace WebAPI.SignalR
             }
             else
             {
-                mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? Mark.X : Mark.O;
+                mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainGame.PlayerOne.Id ? Mark.X : Mark.O;
                 var makeMove=mainMatch.MakeMove(r, c);
                 if (makeMove.ErrorCode!=1)
                 {
@@ -218,7 +212,7 @@ namespace WebAPI.SignalR
             }
             
             var winnerId=mainMatch.WinnerId;
-            var loserId = winnerId == mainGame.PlayerOne.Id ? mainGame.PlayerOne.Id : winnerId == mainGame.PlayerTwo.Id ? mainGame.PlayerTwo.Id : -1;
+            var loserId = winnerId == mainGame.PlayerOne.Id ? mainGame.PlayerTwo.Id : winnerId == mainGame.PlayerTwo.Id ? mainGame.PlayerOne.Id : -1;
             if (mainGame.TargetScore!=mainGame.PlayerOneScore && mainGame.TargetScore!=mainGame.PlayerTwoScore)
             {
                 if (winnerId!=-1)

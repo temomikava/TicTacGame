@@ -28,8 +28,6 @@ builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
-
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: MyAllowSpecificOrigins,
@@ -56,11 +54,6 @@ if (app.Environment.IsDevelopment())
 
 }
 
-
-
-
-
-
 app.UseCors(MyAllowSpecificOrigins);
 Guid guid = new Guid();
 app.Use(async (context, next) =>
@@ -76,12 +69,8 @@ app.Use(async (context, next) =>
             guid = validSessionId;
         }
         
-
-
-
         var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
         var id = dal.GetUserId(guid);
-
 
         if (id == -1)
         {
@@ -102,11 +91,6 @@ app.Use(async (context, next) =>
 
 app.MapHub<GameHub>("signalr");
 
-
-
-//app.UseMiddleware<WebSocketsMiddleware>();
-//app.UseAuthentication();
-//app.UseAuthorization();
 
 app.MapControllers();
 
