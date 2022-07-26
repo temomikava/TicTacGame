@@ -1,5 +1,4 @@
 ﻿using GameLibrary.Enums;
-
 namespace GameLibrary
 {
     public class Match:Game
@@ -19,8 +18,7 @@ namespace GameLibrary
 
         public static event Action<int, int> MoveMade;
         public static event Action<MatchResult> MatchEnded;
-        public static event Action MatchRestarted;
-
+        //public static event Action MatchRestarted;
         private bool IsGridFull()
         {
             return TurnsPassed == GameGrid.Length;
@@ -128,14 +126,13 @@ namespace GameLibrary
             {
                 MatchOver = true;
                 FinishedAt = DateTime.Now;
-                SwitchPlayer();
-                MoveMade?.Invoke(r, c);
-                MatchEnded?.Invoke(MatchResult);
+                //MoveMade?.Invoke(r, c);
+                //MatchEnded?.Invoke(MatchResult);
             }
             else
             {
                 SwitchPlayer();
-                MoveMade?.Invoke(r, c);
+               // MoveMade?.Invoke(r, c);
             }
             return (canMakeMove);
         }
@@ -146,7 +143,7 @@ namespace GameLibrary
             CurrentPlayer = Mark.X;
             TurnsPassed = 0;
             MatchOver = false;
-            MatchRestarted?.Invoke();
+            //MatchRestarted?.Invoke();
         }
 
 
