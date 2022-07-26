@@ -274,7 +274,7 @@ namespace WebAPI.Core.Services
                         cmd.Parameters.AddWithValue("_gameid",match.GameId);
                         cmd.Parameters.AddWithValue("_playeronescore", match.PlayerOneScore);
                         cmd.Parameters.AddWithValue("_playertwoscore", match.PlayerTwoScore);
-                        cmd.Parameters.AddWithValue("_finishedat", match.FinishedAt);
+                        cmd.Parameters.AddWithValue("_finishedat", DateTime.Now);
                         cmd.Parameters.AddWithValue("_winnerid", match.WinnerId);
                         cmd.Parameters.AddWithValue("_stateid", (int)StateType.Finished);
                         connection.Open();
