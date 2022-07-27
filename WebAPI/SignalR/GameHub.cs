@@ -37,7 +37,7 @@ namespace WebAPI.SignalR
             var games = _connection.GetGames();
             await Clients.Caller.SendAsync("getallgame", games);
         }
-       
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Authentication).Value;
@@ -75,11 +75,11 @@ namespace WebAPI.SignalR
         }
 
 
-        public async Task CreateGame(CreateGameRequest request)
+        public async Task CreateGame(int boardSize, int scoreTarget)
         {
-            int boardSize = request.BoardSize;
+           //int boardSize = request.BoardSize;
 
-            int scoreTarget = request.ScoreTarget;
+           //int scoreTarget = request.ScoreTarget;
             if (boardSize < 3)
             {
                 await Clients.Caller.SendAsync("ongamecreate", -1, "boardsize cannot be less than 3");
@@ -111,9 +111,9 @@ namespace WebAPI.SignalR
 
         }
 
-        public async Task JoinToGame(JoinToGameRequest request)
+        public async Task JoinToGame(int gameId)
         {
-            int gameId = request.GameId;
+            //int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var join = _connection.JoinToGame(gameId, playerTwoId);
 
@@ -121,8 +121,8 @@ namespace WebAPI.SignalR
 
             mainGame = _connection.GetGameByID(gameId);
 
-            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", "opponent connected! your turn ",1);
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", mainGame.PlayerOne.UserName + "`s turn",1);
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", "opponent connected! your turn ", 1);
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", mainGame.PlayerOne.UserName + "`s turn", 1);
             //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
 
             await GameStart(gameId);
@@ -147,180 +147,102 @@ namespace WebAPI.SignalR
 
         }
 
-        public async Task MakeMove(MakeMoveRequest request)
+        public async Task MakeMove(int gameId,int r , int c)
         {
-            int gameId = request.GameId;
-            int r = request.Row;
-            int c = request.Column;
+            //int gameId = request.GameId;
+            //int r = request.Row;
+            //int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            
+
             mainGame = _connection.GetGameByID(gameId);
             mainMatch = _connection.GetActiveMatch(gameId);
-           
+
             if (mainMatch == null)
             {
-                await Clients.Caller.SendAsync("nextturn",-1, "match is not started");
+                await Clients.Caller.SendAsync("nextturn", -1, "match is not started");
                 return;
             }
-            
+
             mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id, UserName = mainGame.PlayerOne.UserName };
             mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id, UserName = mainGame.PlayerTwo.UserName };
             mainMatch.GameGrid = _connection.FillGrid(mainMatch);
             if (mainMatch.CurrentPlayerId != callerId)
             {
-                await Clients.Caller.SendAsync("nextturn", -1,"wait for your turn");
+                await Clients.Caller.SendAsync("nextturn", -1, "wait for your turn");
+                return;
 
             }
-            else
+
+            mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainGame.PlayerOne.Id ? Mark.X : Mark.O;
+            var makeMove = mainMatch.MakeMove(r, c);
+            if (makeMove.ErrorCode != 1)
             {
-                List<string> ids = new List<string> { mainMatch.PlayerOne.Id.ToString(), mainMatch.PlayerTwo.Id.ToString() };
-                mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainGame.PlayerOne.Id ? Mark.X : Mark.O;
-                var makeMove = mainMatch.MakeMove(r, c);
-                if (makeMove.ErrorCode!=1)
-                {
-                   await Clients.Caller.SendAsync("nextturn",-1, makeMove.ErrorMessage);
-                   return;
-                }
-                if (mainMatch.MatchOver!=true)
-                {
-                    var caller = callerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
-                    var opponent = caller == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
-                    await Clients.Caller.SendAsync("nextturn",1, opponent.UserName + "`s turn");
-                    await Clients.User(opponent.Id.ToString()).SendAsync("nextturn",1, "your turn");
-                    _connection.MakeMove(mainMatch,r,c);
-                    return;
-                }
-                
-                Player winner=new Player();
-                Player loser=new Player();
-                if (mainMatch.MatchResult.Winner != Mark.None)
-                {
-                    winner = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
-                    loser = winner == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
-
-                    if (winner == mainMatch.PlayerOne)
-                    {
-                        mainMatch.PlayerOneScore = ++mainGame.PlayerOneScore;
-                        mainMatch.PlayerTwoScore = mainGame.PlayerTwoScore;
-                        mainMatch.WinnerId=mainMatch.PlayerOne.Id;
-                    }
-                    else
-                    {
-                        mainMatch.PlayerTwoScore = ++mainGame.PlayerTwoScore;
-                        mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
-                        mainMatch.WinnerId= mainMatch.PlayerTwo.Id;
-                    }
-                   
-                    _connection.MatchEnd(mainMatch);
-                }
-                else
-                {
-                    mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
-                    mainMatch.PlayerTwoScore = mainGame.PlayerTwoScore;
-                    mainMatch.WinnerId = -1;
-                    _connection.MatchEnd(mainMatch);
-                    await Clients.Users(ids).SendAsync("matchend",mainMatch.PlayerOneScore,mainMatch.PlayerTwoScore, "it is a tie");
-                    await MatchStart(mainGame.Id);
-                    return;
-                }
-                if (mainGame.TargetScore!=mainMatch.PlayerOneScore&&mainGame.TargetScore!=mainMatch.PlayerTwoScore)
-                {
-                    
-                        await Clients.User(winner.Id.ToString()).SendAsync("matchend",mainGame.PlayerOneScore,mainGame.PlayerTwoScore, "you win the match!");
-                        await Clients.User(loser.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the match!");
-                        _connection.MatchEnd(mainMatch);
-                                                          
-                        await MatchStart(mainGame.Id);
-                    return;
-                    
-                }
-                else
-                {
-                    _connection.MatchEnd(mainMatch);
-                    mainGame.Winner_Player_id = mainMatch.WinnerId;
-                    mainGame.StateId = (int)StateType.Finished;
-                    _connection.GameEnd(mainGame);
-                }
+                await Clients.Caller.SendAsync("nextturn", -1, makeMove.ErrorMessage);
+                return;
             }
-
-           
-        }
-
-        
-
-        private async void Match_MatchEnded(MatchResult result)
-        {
-            List<string> ids = new List<string> { mainGame.PlayerOne.Id.ToString(), mainGame.PlayerTwo.Id.ToString() };
-            if (result.Winner == Mark.X)
-            {
-                mainMatch.WinnerId = mainGame.PlayerOne.Id;
-                mainMatch.PlayerOneScore = ++mainGame.PlayerOneScore;
-                mainMatch.PlayerTwoScore= mainGame.PlayerTwoScore;
-                _connection.MatchEnd(mainMatch);
-
-            }
-            else if (result.Winner == Mark.O)
-            {
-                mainMatch.WinnerId = mainGame.PlayerTwo.Id;
-                mainMatch.PlayerTwoScore = ++mainGame.PlayerTwoScore;
-                mainMatch.PlayerOneScore= mainGame.PlayerOneScore;
-                _connection.MatchEnd(mainMatch);
-            }
-            else
-            {
-                mainMatch.WinnerId = -1;
-                mainMatch.PlayerTwoScore=mainGame.PlayerTwoScore;
-                mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
-                _connection.MatchEnd(mainMatch);
-            }
-
-            var winnerId = mainMatch.WinnerId;
-            var loserId = winnerId == mainGame.PlayerOne.Id ? mainGame.PlayerTwo.Id : winnerId == mainGame.PlayerTwo.Id ? mainGame.PlayerOne.Id : -1;
-            if (mainGame.TargetScore != mainMatch.PlayerOneScore && mainGame.TargetScore != mainMatch.PlayerTwoScore)
-            {
-                if (winnerId != -1)
-                {
-                    await Clients.User(winnerId.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you Win the match");
-                    await Clients.User(loserId.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the match!");
-                }
-                else
-                {
-                    await Clients.Users(ids).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "it's a tie");
-                }
-                await MatchStart(mainGame.Id);
-            }
-            else
-            {
-                mainGame.StateId = 3;
-                mainGame.Winner_Player_id = mainMatch.WinnerId;
-                _connection.GameEnd(mainGame);
-                await Clients.User(winnerId.ToString()).SendAsync("gameend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you Win the game");
-                await Clients.User(loserId.ToString()).SendAsync("gameend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the game!");
-            }
-        }
-        private async void Match_MoveMade(int r, int c,int callerId)
-        {
-            _connection.MakeMove(mainMatch, r, c);
-            if (mainMatch.MatchOver!=true)
+            if (mainMatch.MatchOver != true)
             {
                 var caller = callerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
-                var opponent=caller==mainMatch.PlayerOne?mainMatch.PlayerTwo:mainMatch.PlayerOne;
-                await Clients.User(callerId.ToString()).SendAsync("nextturn", opponent.UserName + "`s turn",1);
-                await Clients.User(opponent.Id.ToString()).SendAsync("your turn",1);
+                var opponent = caller == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
+                await Clients.Caller.SendAsync("nextturn", 1, opponent.UserName + "`s turn");
+                await Clients.User(opponent.Id.ToString()).SendAsync("nextturn", 1, "your turn");
+                _connection.MakeMove(mainMatch, r, c);
+                return;
             }
-            
-        }
-        private void MoveMade(int r, int c)
+           MatchEnd();
+        }     
+        private async void MatchEnd()
         {
-            _connection.MakeMove(mainMatch, r, c);
+            List<string> ids = new List<string> { mainMatch.PlayerOne.Id.ToString(), mainMatch.PlayerTwo.Id.ToString() };
 
+            Player winner = new Player();
+            Player loser = new Player();
+            if (mainMatch.MatchResult.Winner != Mark.None)
+            {
+                winner = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
+                loser = winner == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
+
+                if (winner == mainMatch.PlayerOne)
+                {
+                    mainMatch.PlayerOneScore = ++mainGame.PlayerOneScore;
+                    mainMatch.PlayerTwoScore = mainGame.PlayerTwoScore;
+                    mainMatch.WinnerId = mainMatch.PlayerOne.Id;
+                }
+                else
+                {
+                    mainMatch.PlayerTwoScore = ++mainGame.PlayerTwoScore;
+                    mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
+                    mainMatch.WinnerId = mainMatch.PlayerTwo.Id;
+                }
+
+                _connection.MatchEnd(mainMatch);
+            }
+            else
+            {
+                mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
+                mainMatch.PlayerTwoScore = mainGame.PlayerTwoScore;
+                mainMatch.WinnerId = -1;
+                _connection.MatchEnd(mainMatch);
+                await Clients.Users(ids).SendAsync("matchend", mainMatch.PlayerOneScore, mainMatch.PlayerTwoScore, "it is a tie");
+                await MatchStart(mainGame.Id);
+                return;
+            }
+            if (mainGame.TargetScore != mainMatch.PlayerOneScore && mainGame.TargetScore != mainMatch.PlayerTwoScore)
+            {
+
+                await Clients.User(winner.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you win the match!");
+                await Clients.User(loser.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the match!");
+                _connection.MatchEnd(mainMatch);
+
+                await MatchStart(mainGame.Id);            
+            }
+            else
+            {
+                _connection.MatchEnd(mainMatch);
+                mainGame.Winner_Player_id = mainMatch.WinnerId;
+                mainGame.StateId = (int)StateType.Finished;
+                _connection.GameEnd(mainGame);
+            }
         }
-
-        private void Match_MatchRestarted()
-        {
-            throw new NotImplementedException();
-        }
-
-
     }
 }
