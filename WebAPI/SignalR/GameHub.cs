@@ -105,7 +105,7 @@ namespace WebAPI.SignalR
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
             mainGame.Id = _connection.GameCreate(mainGame).GameId;
             var games = _connection.GetGames();
-            await Clients.Caller.SendAsync("nextturn", "wait for opponent connection", 1);
+            await Clients.Caller.SendAsync("nextturn",1, "wait for opponent connection");
             await Clients.Others.SendAsync("getallgame", games);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
             //mainMatch = waitingForOponent.Waiting();
@@ -122,8 +122,8 @@ namespace WebAPI.SignalR
 
             mainGame = _connection.GetGameByID(gameId);
 
-            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", "opponent connected! your turn ", 1);
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", mainGame.PlayerOne.UserName + "`s turn", 1);
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn",1, "opponent connected! your turn ");
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn",1, mainGame.PlayerOne.UserName + "`s turn");
 
             //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
 
@@ -164,17 +164,17 @@ namespace WebAPI.SignalR
                 return;
             }
 
-            mainMatch.PlayerOne = new Player { Id = mainGame.PlayerOne.Id, UserName = mainGame.PlayerOne.UserName };
-            mainMatch.PlayerTwo = new Player { Id = mainGame.PlayerTwo.Id, UserName = mainGame.PlayerTwo.UserName };
-            mainMatch.GameGrid = _connection.FillGrid(mainMatch);
+           
             if (mainMatch.CurrentPlayerId != callerId)
             {
                 await Clients.Caller.SendAsync("nextturn", -1, "wait for your turn");
                 return;
 
             }
-
-            mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainGame.PlayerOne.Id ? Mark.X : Mark.O;
+            mainMatch.PlayerOne = mainGame.PlayerOne;
+            mainMatch.PlayerTwo = mainGame.PlayerTwo;
+            mainMatch.GameGrid = _connection.FillGrid(mainMatch);
+            mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? Mark.X : Mark.O;
             var makeMove = mainMatch.MakeMove(r, c);
             if (makeMove.ErrorCode != 1)
             {
@@ -211,8 +211,8 @@ namespace WebAPI.SignalR
                 }
                 else
                 {
-                    mainMatch.PlayerTwoScore = ++mainGame.PlayerTwoScore;
                     mainMatch.PlayerOneScore = mainGame.PlayerOneScore;
+                    mainMatch.PlayerTwoScore = ++mainGame.PlayerTwoScore;
                     mainMatch.WinnerId = mainMatch.PlayerTwo.Id;
                 }
 
@@ -242,6 +242,8 @@ namespace WebAPI.SignalR
                 _connection.MatchEnd(mainMatch);
                 mainGame.Winner_Player_id = mainMatch.WinnerId;
                 mainGame.StateId = (int)StateType.Finished;
+                await Clients.User(winner.Id.ToString()).SendAsync("gameend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you win the game!");
+                await Clients.User(loser.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the game!");
                 _connection.GameEnd(mainGame);
             }
         }
