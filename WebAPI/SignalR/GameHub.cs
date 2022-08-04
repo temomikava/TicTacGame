@@ -6,7 +6,7 @@ using System.Security.Claims;
 using WebAPI.Core.Interface;
 using GameLibrary.Enums;
 using WebAPI.Requests;
-
+using System;
 namespace WebAPI.SignalR
 {
 
@@ -53,10 +53,7 @@ namespace WebAPI.SignalR
                     var opponentId = id == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
 
                     await Clients.User(opponentId.ToString()).SendAsync("ondisconnected", -1, "opponent disconnected!");
-
                 }
-
-
             }
 
             var availableGames = _connection.GetGames();
@@ -77,8 +74,8 @@ namespace WebAPI.SignalR
 
         public async Task CreateGame(CreateGameRequest request)
         {
-            int boardSize = request.BoardSize;
-
+            int boardSize1 = request.BoardSize;
+            int boardSize = (int)Math.Sqrt(boardSize1);
             int scoreTarget = request.ScoreTarget;
 
             if (boardSize < 3)
@@ -98,14 +95,14 @@ namespace WebAPI.SignalR
             int playerOneId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = new Game();
             mainGame.CreatedAt = DateTime.Now;
-            mainGame.BoardSize = boardSize;
+            mainGame.BoardSize = boardSize1;
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
             mainGame.Id = _connection.GameCreate(mainGame).GameId;
             var games = _connection.GetGames();
-            await Clients.Caller.SendAsync("nextturn",1, "wait for opponent connection");
+            await Clients.Caller.SendAsync("nextturn", 1, "wait for opponent connection", -1, -1, "");
             await Clients.Others.SendAsync("getallgame", games);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
             //mainMatch = waitingForOponent.Waiting();
@@ -122,8 +119,8 @@ namespace WebAPI.SignalR
 
             mainGame = _connection.GetGameByID(gameId);
 
-            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn",1, "opponent connected! your turn ");
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn",1, mainGame.PlayerOne.UserName + "`s turn");
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", 1, "opponent connected! your turn ", -1, -1, "");
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn", -1, -1, "");
 
             //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
 
@@ -133,20 +130,31 @@ namespace WebAPI.SignalR
         private async Task GameStart(int gameId)
         {
             _connection.GameStart(gameId);
+            mainGame = _connection.GetGameByID(gameId);
             var games = _connection.GetGames();
-            await Clients.All.SendAsync("getallgame", games);
+            await Clients.Others.SendAsync("getallgame", games);
             await MatchStart(gameId);
         }
         private async Task MatchStart(int gameId)
         {
-            mainGame = _connection.GetGameByID(gameId);
             var match = new Match();
             match.GameId = gameId;
             match.StateId = (int)StateType.Started;
             match.CurrentPlayerId = mainGame.PlayerOne.Id;
             match.StartedAt = DateTime.Now;
+            mainMatch = match;
             _connection.MatchStart(match);
 
+
+        }
+        public async Task NextMatch(int gameId)
+        {
+            Thread.Sleep(5000);
+            await MatchStart(gameId);
+            var ids = new List<string> { mainGame.PlayerOne.Id.ToString(), mainGame.PlayerTwo.Id.ToString() };
+            await Clients.Users(ids).SendAsync("matchstart", mainMatch.GameId,mainMatch.StateId,mainMatch.CurrentPlayerId);
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn",1, "your turn",-1,-1,"");
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn",1, mainGame.PlayerOne.UserName + "`s turn",-1,-1,"");
         }
 
         public async Task MakeMove(MakeMoveRequest request)
@@ -160,14 +168,14 @@ namespace WebAPI.SignalR
 
             if (mainMatch == null)
             {
-                await Clients.Caller.SendAsync("nextturn", -1, "match is not started");
+                await Clients.Caller.SendAsync("nextturn", -1, "match is not started", -1, -1, "");
                 return;
             }
 
-           
+
             if (mainMatch.CurrentPlayerId != callerId)
             {
-                await Clients.Caller.SendAsync("nextturn", -1, "wait for your turn");
+                await Clients.Caller.SendAsync("nextturn", -1, "wait for your turn", -1, -1, "");
                 return;
 
             }
@@ -178,17 +186,24 @@ namespace WebAPI.SignalR
             var makeMove = mainMatch.MakeMove(r, c);
             if (makeMove.ErrorCode != 1)
             {
-                await Clients.Caller.SendAsync("nextturn", -1, makeMove.ErrorMessage);
+                await Clients.Caller.SendAsync("nextturn", -1, makeMove.ErrorMessage, -1, -1, "");
                 return;
             }
+            var currentmove = mainMatch.CurrentPlayer == Mark.X ? "X" : "O";
+            var caller = callerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
+            var opponent = caller == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
             if (mainMatch.MatchOver != true)
             {
-                var caller = callerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
-                var opponent = caller == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
-                await Clients.Caller.SendAsync("nextturn", 1, opponent.UserName + "`s turn");
-                await Clients.User(opponent.Id.ToString()).SendAsync("nextturn", 1, "your turn");
+
+                await Clients.Caller.SendAsync("nextturn", 1, opponent.UserName + "`s turn", r, c, currentmove);
+                await Clients.User(opponent.Id.ToString()).SendAsync("nextturn", 1, "your turn", r, c, currentmove);
                 _connection.MakeMove(mainMatch, r, c);
                 return;
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("nextturn", 1, "match Over", r, c, currentmove);
+                await Clients.User(opponent.Id.ToString()).SendAsync("nextturn", 1, "match over", r, c, currentmove);
             }
             MatchEnd();
         }
@@ -225,7 +240,8 @@ namespace WebAPI.SignalR
                 mainMatch.WinnerId = -1;
                 _connection.MatchEnd(mainMatch);
                 await Clients.Users(ids).SendAsync("matchend", mainMatch.PlayerOneScore, mainMatch.PlayerTwoScore, "it is a tie");
-                await MatchStart(mainGame.Id);
+                await NextMatch(mainGame.Id);
+                // await MatchStart(mainGame.Id);
                 return;
             }
             if (mainGame.TargetScore != mainMatch.PlayerOneScore && mainGame.TargetScore != mainMatch.PlayerTwoScore)
@@ -235,7 +251,8 @@ namespace WebAPI.SignalR
                 await Clients.User(loser.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the match!");
                 _connection.MatchEnd(mainMatch);
 
-                await MatchStart(mainGame.Id);
+                await NextMatch(mainGame.Id);
+                //await MatchStart(mainGame.Id);
             }
             else
             {

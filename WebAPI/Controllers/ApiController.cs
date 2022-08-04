@@ -33,12 +33,7 @@ namespace WebAPI.Controllers
                 SessionId = data.SessionId,
                 ErrorCode=data.ErrorCode,
                 ErrorMessage=data.ErrorMessage
-            });
-            
-            
+            });                      
         }
-
-
-
     }
 }

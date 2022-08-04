@@ -69,8 +69,8 @@ app.Use(async (context, next) =>
             guid = validSessionId;
         }
         
-        var dal = context.RequestServices.GetRequiredService<IDatabaseConnection>();
-        var id = dal.GetUserId(guid);
+        var service = context.RequestServices.GetRequiredService<IDatabaseConnection>();
+        var id = service.GetUserId(guid);
 
         if (id == -1)
         {
