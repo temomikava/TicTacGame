@@ -34,7 +34,8 @@ namespace WebAPI.SignalR
             {
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
-            var games = _connection.GetGames();
+            var games =await _connection.GetGames();
+            if (games.Count() > 0)
             await Clients.Caller.SendAsync("getallgame", games);
         }
 
@@ -42,7 +43,7 @@ namespace WebAPI.SignalR
         {
             string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Authentication).Value;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            var games = _connection.GetGames();
+            var games =await _connection.GetGames();
             List<Game> connectedGames = new List<Game>();
             games.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id).ToList().ForEach(x => connectedGames.Add(x));
             connectedGames.ForEach(x => _connection.Ondisconnected(x.Id));
@@ -113,11 +114,18 @@ namespace WebAPI.SignalR
         {
             int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
+            var game=await _connection.GetGameByID(gameId);
+            if (game.Id != 0 && game.PlayerOne.Id == playerTwoId)
+            {
+                await Clients.Caller.SendAsync("ongamejoin",-1, "you can not join to game which is created by you");
+                return;
+            }
+            await Clients.Caller.SendAsync("ongamejoin", 1, "success");
             var join = _connection.JoinToGame(gameId, playerTwoId);
 
 
 
-            mainGame = _connection.GetGameByID(gameId);
+            mainGame =await _connection.GetGameByID(gameId);
 
             await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", 1, "opponent connected! your turn ", -1, -1, "");
             await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn", -1, -1, "");
@@ -130,8 +138,8 @@ namespace WebAPI.SignalR
         private async Task GameStart(int gameId)
         {
             _connection.GameStart(gameId);
-            mainGame = _connection.GetGameByID(gameId);
-            var games = _connection.GetGames();
+            mainGame =await _connection.GetGameByID(gameId);
+            var games =await _connection.GetGames();
             await Clients.Others.SendAsync("getallgame", games);
             await MatchStart(gameId);
         }
@@ -163,8 +171,8 @@ namespace WebAPI.SignalR
             int r = request.Row;
             int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            mainGame = _connection.GetGameByID(gameId);
-            mainMatch = _connection.GetActiveMatch(gameId);
+            mainGame =await _connection.GetGameByID(gameId);
+            mainMatch =await _connection.GetActiveMatch(gameId);
 
             if (mainMatch == null)
             {
@@ -181,7 +189,7 @@ namespace WebAPI.SignalR
             }
             mainMatch.PlayerOne = mainGame.PlayerOne;
             mainMatch.PlayerTwo = mainGame.PlayerTwo;
-            mainMatch.GameGrid = _connection.FillGrid(mainMatch);
+            mainMatch.GameGrid =await _connection.FillGrid(mainMatch);
             mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? Mark.X : Mark.O;
             var makeMove = mainMatch.MakeMove(r, c);
             if (makeMove.ErrorCode != 1)

@@ -67,19 +67,19 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        public Mark[,] FillGrid(Match match)
+        public async Task<Mark[,]> FillGrid(Match match)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
-                List<Move>moves=new List<Move>();
+                List<Move> moves = new List<Move>();
                 try
                 {
                     var cmd = new NpgsqlCommand("getmovesbymatchid", connection) { CommandType = CommandType.StoredProcedure };
                     cmd.Parameters.AddWithValue("_matchid", match.Id);
-                    var game = GetGameByID(match.GameId);
+                    var game = await GetGameByID(match.GameId);
 
                     connection.Open();
-                    NpgsqlDataReader reader=cmd.ExecuteReader();                    
+                    NpgsqlDataReader reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
                         Move move = new Move();
@@ -91,11 +91,11 @@ namespace WebAPI.Core.Services
                         moves.Add(move);
                     }
                     int boardSize = (int)System.Math.Sqrt(game.BoardSize);
-                    Mark[,]grid=new Mark[boardSize,boardSize];
+                    Mark[,] grid = new Mark[boardSize, boardSize];
                     var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
                     var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
                     playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);
-                    playerTwoMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.O);                   
+                    playerTwoMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.O);
                     return grid;
 
                 }
@@ -107,15 +107,15 @@ namespace WebAPI.Core.Services
             }
 
         }
-        
-        public void MakeMove(Match match,int r, int c)
+
+        public void MakeMove(Match match, int r, int c)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 try
                 {
                     var cmd = new NpgsqlCommand("makemove", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_playerid", match.CurrentPlayerId==match.PlayerOne.Id? match.PlayerTwo.Id:match.PlayerOne.Id);
+                    cmd.Parameters.AddWithValue("_playerid", match.CurrentPlayerId == match.PlayerOne.Id ? match.PlayerTwo.Id : match.PlayerOne.Id);
                     cmd.Parameters.AddWithValue("_matchid", match.Id);
                     cmd.Parameters.AddWithValue("_rowcoordinate", r);
                     cmd.Parameters.AddWithValue("_columncoordinate", c);
@@ -132,11 +132,11 @@ namespace WebAPI.Core.Services
             }
 
         }
-        public Match GetActiveMatch(int gameId)
+        public async Task<Match> GetActiveMatch(int gameId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
-                var activeMatch=new Match();
+                var activeMatch = new Match();
                 try
                 {
                     var cmd = new NpgsqlCommand("get_active_matches", connection) { CommandType = CommandType.StoredProcedure };
@@ -156,8 +156,8 @@ namespace WebAPI.Core.Services
                         activeMatch.StartedAt = (DateTime)reader["started_at"];
                         activeMatch.MatchOver = (bool)reader["matchover"];
                     }
-                    
-                    
+
+
                     return activeMatch;
                 }
                 catch (Exception)
@@ -210,7 +210,7 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        
+
         public (int ErrorCode, string ErrorMessage) GameStart(int gameId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
@@ -219,12 +219,12 @@ namespace WebAPI.Core.Services
                 {
                     using (var cmd = new NpgsqlCommand("gamestart", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_gameid",gameId);
+                        cmd.Parameters.AddWithValue("_gameid", gameId);
                         cmd.Parameters.AddWithValue("_startedat", DateTime.Now);
                         cmd.Parameters.AddWithValue("_stateid", (int)StateType.Started);
                         connection.Open();
-                        cmd.ExecuteNonQuery ();
-                        return(1, "success");
+                        cmd.ExecuteNonQuery();
+                        return (1, "success");
                     }
 
                 }
@@ -272,7 +272,7 @@ namespace WebAPI.Core.Services
                     using (var cmd = new NpgsqlCommand("match_end", connection) { CommandType = CommandType.StoredProcedure })
                     {
                         cmd.Parameters.AddWithValue("_matchid", match.Id);
-                        cmd.Parameters.AddWithValue("_gameid",match.GameId);
+                        cmd.Parameters.AddWithValue("_gameid", match.GameId);
                         cmd.Parameters.AddWithValue("_playeronescore", match.PlayerOneScore);
                         cmd.Parameters.AddWithValue("_playertwoscore", match.PlayerTwoScore);
                         cmd.Parameters.AddWithValue("_finishedat", DateTime.Now);
@@ -300,11 +300,11 @@ namespace WebAPI.Core.Services
                 {
                     using (var cmd = new NpgsqlCommand("jointogame", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_gameid",gameId);
+                        cmd.Parameters.AddWithValue("_gameid", gameId);
                         cmd.Parameters.AddWithValue("_playerid", playerId);
                         connection.Open();
                         cmd.ExecuteNonQuery();
-                        return(1, "success");
+                        return (1, "success");
                     }
 
                 }
@@ -347,24 +347,26 @@ namespace WebAPI.Core.Services
 
         public (int ErrorCode, string ErrorMessage, string Username) GetUsername(int userId)
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            var connection = new NpgsqlConnection(_connectionString);
+            
+            try
             {
-                try
-                {
-                    var cmd = new NpgsqlCommand("get_username", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_id", userId);
-                    connection.Open();
-                    var username = cmd.ExecuteScalar();
-                    return (1, "success", username.ToString());
-                }
-                catch (Exception)
-                {
-                    return (-1, "fail", "fail");
-                }
+                var cmd = new NpgsqlCommand("get_username", connection) { CommandType = CommandType.StoredProcedure };
+                cmd.Parameters.AddWithValue("_id", userId);
+                connection.Open();
+                var username = cmd.ExecuteScalar();
+                return (1, "success", username.ToString());
             }
-
+            catch (Exception)
+            {
+                return (-1, "fail", "fail");
+            }
+            finally
+            {
+                connection.Close();
+            }
         }
-        
+
 
         public (int ErrorCode, string ErrorMessage, int GameId) GameCreate(Game game)
         {
@@ -389,40 +391,10 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        public Match GetMatchById(int matchId)
-        {
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                var match = new Match();
-                try
-                {
-                    using (var cmd = new NpgsqlCommand("get_match_by_id", connection) { CommandType = CommandType.StoredProcedure })
-                    {
-                        cmd.Parameters.AddWithValue("_match_id",matchId);
-                        connection.Open();
-                        NpgsqlDataReader reader=cmd.ExecuteReader();
-                        match.Id = (int)reader["_id"];
-                        match.StateId = (int)reader["_started_at"];
-                        match.FinishedAt = reader["_finished_at"] is DBNull ? null : (DateTime)reader["_finished_at"];
-                        match.WinnerId = reader["_winnerid"] is DBNull ? 0 : (int)reader["_winnerid"];
-                        match.StateId= (int)reader["_state_id"];
-                        match.GameId= (int)reader["_game_id"];
-                        match.TurnsPassed = reader["_turnspassed"] is DBNull ? 0 : (int)reader["_turnspassed"];
-                        match.CurrentPlayerId = (int)reader["_currentplayerid"];
-                        match.MatchOver=(bool)reader["_matchover"];
-                        return match;
-                    }
 
-                }
-                catch (Exception)
-                {
 
-                    throw;
-                }
-            }
 
-        }
-        public Game GetGameByID(int gameId)
+        public async Task<Game> GetGameByID(int gameId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -433,8 +405,8 @@ namespace WebAPI.Core.Services
                     {
                         cmd.Parameters.AddWithValue("_game_id", gameId);
                         connection.Open();
-                        NpgsqlDataReader reader = cmd.ExecuteReader();
-                        while (reader.Read())
+                        NpgsqlDataReader reader =await cmd.ExecuteReaderAsync();
+                        while (await reader.ReadAsync())
                         {
                             game.Id = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
@@ -447,10 +419,10 @@ namespace WebAPI.Core.Services
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
-                            game.PlayerOne=reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne = reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
                             game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
                         }
-                        
+
                         return game;
 
                     }
@@ -462,7 +434,7 @@ namespace WebAPI.Core.Services
                 }
             }
         }
-        public List<Game> GetGames()
+        public async Task<IEnumerable<Game>> GetGames()
         {
             List<Game> output = new List<Game>();
             using (var connection = new NpgsqlConnection(_connectionString))
@@ -472,8 +444,8 @@ namespace WebAPI.Core.Services
                     using (var cmd = new NpgsqlCommand("getallgames", connection) { CommandType = CommandType.StoredProcedure })
                     {
                         connection.Open();
-                        NpgsqlDataReader reader = cmd.ExecuteReader();
-                        while (reader.Read())
+                        NpgsqlDataReader reader =await cmd.ExecuteReaderAsync();
+                        while (await reader.ReadAsync())
                         {
                             Game game = new Game();
 
@@ -481,10 +453,10 @@ namespace WebAPI.Core.Services
                             game.Id = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
-                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player () : new Player { Id= (int)reader["_player_two_id"] };
-                            if (game.PlayerTwo.Id!=0)
+                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_two_id"] };
+                            if (game.PlayerTwo.Id != 0)
                             {
-                                game.PlayerTwo=new Player { Id=game.PlayerTwo.Id,UserName=GetUsername(game.PlayerTwo.Id).Username};
+                                game.PlayerTwo = new Player { Id = game.PlayerTwo.Id, UserName = GetUsername(game.PlayerTwo.Id).Username };
                             }
                             game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
                             game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
@@ -512,7 +484,7 @@ namespace WebAPI.Core.Services
             }
         }
 
-        public void Ondisconnected(int gameId)
+        public async Task Ondisconnected(int gameId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -520,10 +492,10 @@ namespace WebAPI.Core.Services
                 {
                     using (var cmd = new NpgsqlCommand("ondisconncted", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_gameid",gameId);
-                        cmd.Parameters.AddWithValue("_stateid",(int)StateType.Cancelled);
+                        cmd.Parameters.AddWithValue("_gameid", gameId);
+                        cmd.Parameters.AddWithValue("_stateid", (int)StateType.Cancelled);
                         connection.Open();
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
 
                     }
                 }
