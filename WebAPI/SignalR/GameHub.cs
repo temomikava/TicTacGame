@@ -102,7 +102,7 @@ namespace WebAPI.SignalR
             mainGame.PlayerOne = new Player { Id = playerOneId };
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
             mainGame.Id = _connection.GameCreate(mainGame).GameId;
-            var games = _connection.GetGames();
+            var games = _connection.GetGames().Result;
             await Clients.Caller.SendAsync("nextturn", 1, "wait for opponent connection", -1, -1, "");
             await Clients.Others.SendAsync("getallgame", games);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
@@ -262,6 +262,7 @@ namespace WebAPI.SignalR
                 await NextMatch(mainGame.Id);
                 //await MatchStart(mainGame.Id);
             }
+            
             else
             {
                 _connection.MatchEnd(mainMatch);
