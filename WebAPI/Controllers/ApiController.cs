@@ -25,16 +25,16 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("Authorization")]
-        public async  Task<IActionResult> UserAuthorization([FromBody] AuthorizationModel filter)
+        public async Task<IActionResult> UserAuthorization([FromBody] AuthorizationModel filter)
         {
             var data = _connection.Authorization(filter);
 
             return Ok(new
             {
                 SessionId = data.SessionId,
-                ErrorCode=data.ErrorCode,
-                ErrorMessage=data.ErrorMessage
-            });                      
-        }       
+                ErrorCode = data.ErrorCode,
+                ErrorMessage = data.ErrorMessage
+            });
+        }
     }
 }

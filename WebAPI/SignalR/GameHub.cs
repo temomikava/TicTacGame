@@ -25,7 +25,7 @@ namespace WebAPI.SignalR
         public override async Task OnConnectedAsync()
         {
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            string connid = Context.User.Claims.First(x => x.Type == ClaimTypes.Authentication).Value;
+            string connid = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             if (_users.ContainsKey(id))
             {
                 _users[id].Add(connid);
@@ -41,7 +41,7 @@ namespace WebAPI.SignalR
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Authentication).Value;
+            string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var games =await _connection.GetGames();
             List<Game> connectedGames = new List<Game>();
