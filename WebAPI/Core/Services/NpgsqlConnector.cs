@@ -345,7 +345,7 @@ namespace WebAPI.Core.Services
         }
 
 
-        public (int ErrorCode, string ErrorMessage, string Username) GetUsername(int userId)
+        public async Task<(int ErrorCode, string ErrorMessage, string? Username)> GetUsername(int userId)
         {
             var connection = new NpgsqlConnection(_connectionString);
             
@@ -355,7 +355,7 @@ namespace WebAPI.Core.Services
                 cmd.Parameters.AddWithValue("_id", userId);
                 connection.Open();
                 var username = cmd.ExecuteScalar();
-                return (1, "success", username.ToString());
+                return (1, "success", username?.ToString());
             }
             catch (Exception)
             {
@@ -368,7 +368,7 @@ namespace WebAPI.Core.Services
         }
 
 
-        public (int ErrorCode, string ErrorMessage, int GameId) GameCreate(Game game)
+        public async Task<(int erorrCode, string message, int gameId)> GameCreate(Game game)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -383,11 +383,12 @@ namespace WebAPI.Core.Services
                     connection.Open();
                     var id = cmd.ExecuteScalar();
 
-                    return (1, "done", (int)id);
+                    // return await Task<(1, "done", (int)id)>;
+                    return new (1, "done", (int)id);
                 }
                 catch (Exception e)
                 {
-                    return (-1, e.Message, -1);
+                    return new (-1, "fail", -1);
                 }
             }
         }
@@ -414,13 +415,13 @@ namespace WebAPI.Core.Services
                             game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_two_id"] };
                             game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
                             game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
-                            game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Username;
+                            game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Result.Username;
 
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
                             game.PlayerOne = reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
-                            game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Username;
+                            game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Result.Username;
                         }
 
                         return game;
@@ -456,7 +457,7 @@ namespace WebAPI.Core.Services
                             game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_two_id"] };
                             if (game.PlayerTwo.Id != 0)
                             {
-                                game.PlayerTwo = new Player { Id = game.PlayerTwo.Id, UserName = GetUsername(game.PlayerTwo.Id).Username };
+                                game.PlayerTwo = new Player { Id = game.PlayerTwo.Id, UserName = GetUsername(game.PlayerTwo.Id).Result.Username };
                             }
                             game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
                             game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
@@ -465,7 +466,7 @@ namespace WebAPI.Core.Services
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
                             game.PlayerOne = reader["_player_one_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_one_id"] };
-                            game.PlayerOne = new Player { Id = game.PlayerOne.Id, UserName = GetUsername(game.PlayerOne.Id).Username };
+                            game.PlayerOne = new Player { Id = game.PlayerOne.Id, UserName = GetUsername(game.PlayerOne.Id).Result.Username };
                             output.Add(game);
 
 

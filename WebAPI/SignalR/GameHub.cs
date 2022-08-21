@@ -38,7 +38,7 @@ namespace WebAPI.SignalR
             {
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
-            var games =await _connection.GetGames();
+            var games = _connection.GetGames().Result;
             await Clients.Caller.SendAsync("getallgame", games);
         }
 
@@ -46,7 +46,7 @@ namespace WebAPI.SignalR
         {
             string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            var games =await _connection.GetGames();
+            var games = _connection.GetGames().Result;
             List<Game> connectedGames = new List<Game>();
             games.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id).ToList().ForEach(x => connectedGames.Add(x));
             connectedGames.ForEach(x => _connection.Ondisconnected(x.Id));
@@ -60,7 +60,7 @@ namespace WebAPI.SignalR
                 }
             }
 
-            var availableGames = _connection.GetGames();
+            var availableGames = _connection.GetGames().Result;
             await Clients.All.SendAsync("getallgame", availableGames);
 
             //var connId = Context.ConnectionId;
@@ -103,8 +103,8 @@ namespace WebAPI.SignalR
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
-            mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
-            mainGame.Id = _connection.GameCreate(mainGame).GameId;
+            mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Result.Username;
+            mainGame.Id = _connection.GameCreate(mainGame).Result.gameId;
             var games = _connection.GetGames().Result;
             var gameDTO=mapper.Map<GameDTO>(mainGame);
             await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
