@@ -11,7 +11,7 @@ namespace WebAPI
             this.next = next;
         }
         Guid guid = new Guid();
-        public async Task Invoke(HttpContext httpContext)
+        public async Task InvokeAsync(HttpContext httpContext)
         {
             if (httpContext.Request.Path.StartsWithSegments("/signalr"))
             {

@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddSignalR()
+builder.Services.AddSignalR(o=>o.EnableDetailedErrors=true)
     .AddNewtonsoftJsonProtocol(opts =>
         opts.PayloadSerializerSettings.TypeNameHandling = TypeNameHandling.Auto);
 
@@ -23,7 +23,8 @@ builder.Services.AddSignalR()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IDatabaseConnection, NpgsqlConnector>();
-//builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
+builder.Services.AddSingleton<IUserIdProvider, TicTacUserIdProvider>();
+builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 

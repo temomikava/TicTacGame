@@ -7,6 +7,8 @@ using WebAPI.Core.Interface;
 using GameLibrary.Enums;
 using WebAPI.Requests;
 using System;
+using AutoMapper;
+
 namespace WebAPI.SignalR
 {
 
@@ -14,10 +16,12 @@ namespace WebAPI.SignalR
     {
         Game mainGame;
         Match mainMatch;
+        private readonly IMapper mapper;
         private IDatabaseConnection _connection;
-        public GameHub(IDatabaseConnection connection)
+        public GameHub(IDatabaseConnection connection,IMapper mapper)
         {
             _connection = connection;
+            this.mapper = mapper;
         }
         private static ConcurrentDictionary<int, HashSet<string>> _users = new ConcurrentDictionary<int, HashSet<string>>();
         //private static ConcurrentDictionary<int, HashSet<Match>> _games = new ConcurrentDictionary<int, HashSet<Match>>();
@@ -35,7 +39,6 @@ namespace WebAPI.SignalR
                 _users.TryAdd(id, new HashSet<string>() { connid });
             }
             var games =await _connection.GetGames();
-            if (games.Count() > 0)
             await Clients.Caller.SendAsync("getallgame", games);
         }
 
@@ -73,46 +76,49 @@ namespace WebAPI.SignalR
         }
 
 
-        public async Task CreateGame(CreateGameRequest request)
+        public async Task CreateGame(int boardSize, int scoreTarget)
         {
-            int boardSize1 = request.BoardSize;
-            int boardSize = (int)Math.Sqrt(boardSize1);
-            int scoreTarget = request.ScoreTarget;
+            //int boardSize1 = request.BoardSize;
+            //int boardSize = (int)Math.Sqrt(boardSize1);
+            //int scoreTarget = request.ScoreTarget;
 
-            if (boardSize < 3)
-            {
-                await Clients.Caller.SendAsync("ongamecreate", -1, "boardsize cannot be less than 3");
-                return;
-            }
-            else if (scoreTarget < 1)
-            {
-                await Clients.Caller.SendAsync("ongamecreate", -1, "target score cannot be less than 1");
-                return;
-            }
-            else
-            {
-                await Clients.Caller.SendAsync("ongamecreate", 1, "success");
-            }
+            //if (boardSize < 3)
+            //{
+            //    await Clients.Caller.SendAsync("ongamecreate", -1, "boardsize cannot be less than 3");
+            //    return;
+            //}
+            //else if (scoreTarget < 1)
+            //{
+            //    await Clients.Caller.SendAsync("ongamecreate", -1, "target score cannot be less than 1");
+            //    return;
+            //}
+            //else
+            //{
+            //await Clients.Caller.SendAsync("ongamecreate", 1, "success");
+            //}
             int playerOneId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = new Game();
             mainGame.CreatedAt = DateTime.Now;
-            mainGame.BoardSize = boardSize1;
+            mainGame.BoardSize = boardSize;
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Username;
             mainGame.Id = _connection.GameCreate(mainGame).GameId;
             var games = _connection.GetGames().Result;
-            await Clients.Caller.SendAsync("nextturn", 1, "wait for opponent connection", -1, -1, "");
-            await Clients.Others.SendAsync("getallgame", games);
+            var gameDTO=mapper.Map<GameDTO>(mainGame);
+            await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
+            await Clients.Caller.SendAsync("nextturn", 1, "wait for opponent connection...", -1, -1, "");
+            var gamesDTO = mapper.Map<IEnumerable<Game>>(games);
+            await Clients.Others.SendAsync("getallgame", gamesDTO);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
             //mainMatch = waitingForOponent.Waiting();
 
         }
 
-        public async Task JoinToGame(JoinToGameRequest request)
+        public async Task JoinToGame(int gameId)
         {
-            int gameId = request.GameId;
+            //int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var game=await _connection.GetGameByID(gameId);
             if (game.Id != 0 && game.PlayerOne.Id == playerTwoId)
@@ -120,27 +126,30 @@ namespace WebAPI.SignalR
                 await Clients.Caller.SendAsync("ongamejoin",-1, "you can not join to game which is created by you");
                 return;
             }
-            await Clients.Caller.SendAsync("ongamejoin", 1, "success");
             var join = _connection.JoinToGame(gameId, playerTwoId);
 
 
 
             mainGame =await _connection.GetGameByID(gameId);
 
-            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn", 1, "opponent connected! your turn ", -1, -1, "");
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn", -1, -1, "");
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("ongamejoin", 1, "opponent connected! your turn ");
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn");
 
             //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
 
             await GameStart(gameId);
-
+            
         }
         private async Task GameStart(int gameId)
         {
             _connection.GameStart(gameId);
             mainGame =await _connection.GetGameByID(gameId);
             var games =await _connection.GetGames();
-            await Clients.Others.SendAsync("getallgame", games);
+            var gameDTO=mapper.Map<Game>(mainGame);
+            var gamesDTO=mapper.Map<IEnumerable<Game>>(games);
+            await Clients.Others.SendAsync("getallgame", gamesDTO);
+            await Clients.Users(mainGame.PlayerOne.Id.ToString(),mainGame.PlayerTwo.Id.ToString()).SendAsync("getcurrentgame", gameDTO);
+
             await MatchStart(gameId);
         }
         private async Task MatchStart(int gameId)
@@ -165,11 +174,11 @@ namespace WebAPI.SignalR
             await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn",1, mainGame.PlayerOne.UserName + "`s turn",-1,-1,"");
         }
 
-        public async Task MakeMove(MakeMoveRequest request)
+        public async Task MakeMove(int gameId, int r, int c)
         {
-            int gameId = request.GameId;
-            int r = request.Row;
-            int c = request.Column;
+            //int gameId = request.GameId;
+            //int r = request.Row;
+            //int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame =await _connection.GetGameByID(gameId);
             mainMatch =await _connection.GetActiveMatch(gameId);
