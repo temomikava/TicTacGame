@@ -6,6 +6,13 @@ namespace WebAPI
     {
         public int Id { get; set; }
         public int StateId { get; set; }
+        public string StateIdString
+        {
+            set
+            {
+                value = StateId == 1 ? "created" : StateId == 2 ? "started" : "";
+            }
+        }
         public Player PlayerOne { get; set; }
         public Player PlayerTwo { get; set; }
         public int PlayerOneScore { get; set; }
@@ -13,5 +20,13 @@ namespace WebAPI
         public int Winner_Player_id { get; set; }
         public int TargetScore { get; set; }
         public int BoardSize { get; set; }
+        public string BoardSizeString
+        {
+            set
+            {
+                value = BoardSize.ToString();
+            }
+        }
     }
 }
+

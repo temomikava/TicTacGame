@@ -108,7 +108,6 @@ namespace WebAPI.SignalR
             var games = _connection.GetGames().Result;
             var gameDTO=mapper.Map<GameDTO>(mainGame);
             await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
-            await Clients.Caller.SendAsync("nextturn", 1, "wait for opponent connection...", -1, -1, "");
             var gamesDTO = mapper.Map<IEnumerable<Game>>(games);
             await Clients.Others.SendAsync("getallgame", gamesDTO);
             //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
@@ -120,31 +119,29 @@ namespace WebAPI.SignalR
         {
             //int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            var game=await _connection.GetGameByID(gameId);
-            if (game.Id != 0 && game.PlayerOne.Id == playerTwoId)
-            {
-                await Clients.Caller.SendAsync("ongamejoin",-1, "you can not join to game which is created by you");
-                return;
-            }
+            //var game= _connection.GetGameByID(gameId).Result;
+            //if (game.Id != 0 && game.PlayerOne.Id == playerTwoId)
+            //{
+            //    await Clients.Caller.SendAsync("ongamejoin",-1, "you can not join to game which is created by you");
+            //    return;
+            //}
             var join = _connection.JoinToGame(gameId, playerTwoId);
 
 
+            await GameStart(gameId);
 
-            mainGame =await _connection.GetGameByID(gameId);
 
             await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("ongamejoin", 1, "opponent connected! your turn ");
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn");
+            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName + "`s turn");
 
-            //(mainGame.PlayerOne.Id, mainGame.PlayerTwo.Id).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName+"`s turn");
 
-            await GameStart(gameId);
             
         }
         private async Task GameStart(int gameId)
         {
             _connection.GameStart(gameId);
-            mainGame =await _connection.GetGameByID(gameId);
-            var games =await _connection.GetGames();
+            mainGame = _connection.GetGameByID(gameId).Result;
+            var games = _connection.GetGames().Result;
             var gameDTO=mapper.Map<Game>(mainGame);
             var gamesDTO=mapper.Map<IEnumerable<Game>>(games);
             await Clients.Others.SendAsync("getallgame", gamesDTO);
@@ -169,7 +166,7 @@ namespace WebAPI.SignalR
             Thread.Sleep(5000);
             await MatchStart(gameId);
             var ids = new List<string> { mainGame.PlayerOne.Id.ToString(), mainGame.PlayerTwo.Id.ToString() };
-            await Clients.Users(ids).SendAsync("matchstart", mainMatch.GameId,mainMatch.StateId,mainMatch.CurrentPlayerId);
+            await Clients.Users(ids).SendAsync("matchstart", "second match");
             await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("nextturn",1, "your turn",-1,-1,"");
             await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn",1, mainGame.PlayerOne.UserName + "`s turn",-1,-1,"");
         }
@@ -180,8 +177,8 @@ namespace WebAPI.SignalR
             //int r = request.Row;
             //int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            mainGame =await _connection.GetGameByID(gameId);
-            mainMatch =await _connection.GetActiveMatch(gameId);
+            mainGame = _connection.GetGameByID(gameId).Result;
+            mainMatch = _connection.GetActiveMatch(gameId).Result;
 
             if (mainMatch == null)
             {
@@ -198,7 +195,7 @@ namespace WebAPI.SignalR
             }
             mainMatch.PlayerOne = mainGame.PlayerOne;
             mainMatch.PlayerTwo = mainGame.PlayerTwo;
-            mainMatch.GameGrid =await _connection.FillGrid(mainMatch);
+            mainMatch.GameGrid = _connection.FillGrid(mainMatch).Result;
             mainMatch.CurrentPlayer = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? Mark.X : Mark.O;
             var makeMove = mainMatch.MakeMove(r, c);
             if (makeMove.ErrorCode != 1)
