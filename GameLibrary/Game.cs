@@ -23,8 +23,5 @@ namespace GameLibrary
         public int Winner_Player_id { get; set; }
         public int TargetScore { get; set; }
         public int BoardSize { get; set; }
-
-
-        
     }
 }

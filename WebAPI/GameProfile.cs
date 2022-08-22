@@ -7,8 +7,8 @@ namespace WebAPI
     {
         public GameProfile()
         {
-            CreateMap<Game,GameDTO>();
+            CreateMap<Game, GameDTO>().ReverseMap();
         }
-        
+
     }
 }
