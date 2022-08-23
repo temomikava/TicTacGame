@@ -297,6 +297,9 @@ namespace WebAPI.SignalR
                 await Clients.User(winner.Id.ToString()).SendAsync("gameend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you win the game!");
                 await Clients.User(loser.Id.ToString()).SendAsync("gameend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the game!");
                 _connection.GameEnd(mainGame);
+                var games = _connection.GetGames().Result;
+                var gamesDTOS = mapper.Map<IEnumerable<GameDTO>>(games);
+                await Clients.All.SendAsync("getallgame",gamesDTOS);
                 
             }
         }

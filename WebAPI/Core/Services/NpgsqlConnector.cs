@@ -114,9 +114,13 @@ namespace WebAPI.Core.Services
             {
                 try
                 {
+                    var playerId = match.CurrentPlayerId == match.PlayerOne.Id ? match.PlayerTwo.Id : match.PlayerOne.Id;
+                    var mark = playerId == match.PlayerOne.Id ? "X" : "O";
                     var cmd = new NpgsqlCommand("makemove", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_playerid", match.CurrentPlayerId == match.PlayerOne.Id ? match.PlayerTwo.Id : match.PlayerOne.Id);
+                    cmd.Parameters.AddWithValue("_playerid", playerId);
+                    cmd.Parameters.AddWithValue("_mark", mark);
                     cmd.Parameters.AddWithValue("_matchid", match.Id);
+                    cmd.Parameters.AddWithValue("_matchover", match.MatchOver);
                     cmd.Parameters.AddWithValue("_rowcoordinate", r);
                     cmd.Parameters.AddWithValue("_columncoordinate", c);
                     cmd.Parameters.AddWithValue("_turnspassed", match.TurnsPassed);
@@ -154,7 +158,6 @@ namespace WebAPI.Core.Services
                         activeMatch.TurnsPassed = (int)reader["turnspassed"];
                         activeMatch.CurrentPlayerId = (int)reader["currentplayerid"];
                         activeMatch.StartedAt = (DateTime)reader["started_at"];
-                        activeMatch.MatchOver = (bool)reader["matchover"];
                     }
 
 
