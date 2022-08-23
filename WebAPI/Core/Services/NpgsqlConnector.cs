@@ -351,7 +351,7 @@ namespace WebAPI.Core.Services
         public async Task<(int ErrorCode, string ErrorMessage, string? Username)> GetUsername(int userId)
         {
             var connection = new NpgsqlConnection(_connectionString);
-            
+
             try
             {
                 var cmd = new NpgsqlCommand("get_username", connection) { CommandType = CommandType.StoredProcedure };
@@ -387,11 +387,11 @@ namespace WebAPI.Core.Services
                     var id = cmd.ExecuteScalar();
 
                     // return await Task<(1, "done", (int)id)>;
-                    return new (1, "done", (int)id);
+                    return new(1, "done", (int)id);
                 }
                 catch (Exception e)
                 {
-                    return new (-1, "fail", -1);
+                    return new(-1, "fail", -1);
                 }
             }
         }
@@ -409,7 +409,7 @@ namespace WebAPI.Core.Services
                     {
                         cmd.Parameters.AddWithValue("_game_id", gameId);
                         connection.Open();
-                        NpgsqlDataReader reader =await cmd.ExecuteReaderAsync();
+                        NpgsqlDataReader reader = await cmd.ExecuteReaderAsync();
                         while (await reader.ReadAsync())
                         {
                             game.GameId = (int)reader["_id"];
@@ -423,7 +423,7 @@ namespace WebAPI.Core.Services
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
-                            game.PlayerOne =  new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne = new Player { Id = (int)reader["_player_one_id"] };
                             game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Result.Username;
                         }
 
@@ -448,7 +448,7 @@ namespace WebAPI.Core.Services
                     using (var cmd = new NpgsqlCommand("getallgames", connection) { CommandType = CommandType.StoredProcedure })
                     {
                         connection.Open();
-                        NpgsqlDataReader reader =await cmd.ExecuteReaderAsync();
+                        NpgsqlDataReader reader = await cmd.ExecuteReaderAsync();
                         while (await reader.ReadAsync())
                         {
                             Game game = new Game();
@@ -511,6 +511,59 @@ namespace WebAPI.Core.Services
             }
 
         }
+
+        public async Task WaitingForReconnect(int gameId, int stateId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("waitingforreconnect", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+
+                        cmd.Parameters.AddWithValue("_gameid", gameId);
+                        cmd.Parameters.AddWithValue("_stateid", stateId);
+                        connection.Open();
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+        }
+
+        public async Task<int[]> GetMovesHistory(int gameId)
+        {
+            var match = GetActiveMatch(gameId).Result;
+            var grid = FillGrid(match).Result;
+            var output = new List<int>();
+
+            for (int i = 0; i < grid.GetLength(0); i++)
+            {
+                for (int j = 0; j < grid.GetLength(1); j++)
+                {
+                    if (grid[i,j]==Mark.X)
+                    {
+                        output.Add(1);
+                    }
+                    if (grid[i, j] == Mark.O)
+                    {
+                        output.Add(0);
+                    }
+                    if (grid[i, j] == Mark.None)
+                    {
+                        output.Add(-1);
+                    }
+
+                }
+            }
+            return  output.ToArray();
+        }
+
+
 
 
         //public (int Error, string ErrorMessage) StartGame(Game mainGame)

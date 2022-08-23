@@ -22,7 +22,8 @@ namespace WebAPI.Core.Interface
         public void MakeMove(Match match, int r, int c);
         public  Task<Mark[,]> FillGrid(Match match);
         public Task Ondisconnected(int gameId);
-
+        public Task WaitingForReconnect(int gameId,int stateId);
+        public Task<int[]> GetMovesHistory(int gameId);
 
 
 

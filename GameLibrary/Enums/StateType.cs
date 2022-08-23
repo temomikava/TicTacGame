@@ -2,6 +2,6 @@
 {
     public enum StateType
     {
-        Created=1, Started, Finished, Cancelled
+        Created=1, Started, Finished, Cancelled,WaitingForReconnect
     }
 }
