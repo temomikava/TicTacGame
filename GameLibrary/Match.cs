@@ -129,11 +129,7 @@ namespace GameLibrary
                 //MoveMade?.Invoke(r, c);
                 //MatchEnded?.Invoke(MatchResult);
             }
-            else
-            {
-                SwitchPlayer();
-               // MoveMade?.Invoke(r, c);
-            }
+            SwitchPlayer();
             return (canMakeMove);
         }
 

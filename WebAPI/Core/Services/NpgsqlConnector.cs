@@ -325,7 +325,7 @@ namespace WebAPI.Core.Services
                 {
                     using (var cmd = new NpgsqlCommand("game_end", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_gameid", game.Id);
+                        cmd.Parameters.AddWithValue("_gameid", game.GameId);
                         cmd.Parameters.AddWithValue("_finishedat", DateTime.Now);
                         cmd.Parameters.AddWithValue("_stateid", game.StateId);
                         cmd.Parameters.AddWithValue("_winnerid", game.Winner_Player_id);
@@ -409,10 +409,10 @@ namespace WebAPI.Core.Services
                         NpgsqlDataReader reader =await cmd.ExecuteReaderAsync();
                         while (await reader.ReadAsync())
                         {
-                            game.Id = (int)reader["_id"];
+                            game.GameId = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
-                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_two_id"] };
+                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_two_id"] };
                             game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
                             game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
                             game.PlayerTwo.UserName = GetUsername(game.PlayerTwo.Id).Result.Username;
@@ -420,7 +420,7 @@ namespace WebAPI.Core.Services
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
-                            game.PlayerOne = reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne =  new Player { Id = (int)reader["_player_one_id"] };
                             game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Result.Username;
                         }
 
@@ -451,7 +451,7 @@ namespace WebAPI.Core.Services
                             Game game = new Game();
 
 
-                            game.Id = (int)reader["_id"];
+                            game.GameId = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
                             game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_two_id"] };

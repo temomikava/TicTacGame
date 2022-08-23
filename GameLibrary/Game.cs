@@ -9,7 +9,7 @@ namespace GameLibrary
 {
     public class Game
     {
-        public int Id { get; set; }
+        public int GameId { get; set; }
         public Mark[,] GameGrid { get; set; }
         public List<Match> MatchList { get; set; }=new ();
         public DateTime? CreatedAt { get; set; }

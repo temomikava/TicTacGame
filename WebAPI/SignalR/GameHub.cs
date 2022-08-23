@@ -48,9 +48,20 @@ namespace WebAPI.SignalR
             string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var games = _connection.GetGames().Result;
+            //var notStartedGames = games.Where(x => x.PlayerOne.GameId==id && x.PlayerTwo == null);
+            //var startedGames = games.Where(x => x.PlayerOne.GameId == id && x.PlayerTwo != null);
+            //foreach (var game in notStartedGames)
+            //{
+            //   await _connection.Ondisconnected(game.GameId);
+            //}
+            //foreach (var game in startedGames)
+            //{
+            //    int opponentId=id==game.PlayerOne.GameId?game.PlayerTwo.GameId:game.PlayerOne.GameId;
+            //    _connection.WaitingForReconnect(game.GameId);
+            //}
             List<Game> connectedGames = new List<Game>();
             games.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id).ToList().ForEach(x => connectedGames.Add(x));
-            connectedGames.ForEach(x => _connection.Ondisconnected(x.Id));
+            connectedGames.ForEach(x => _connection.Ondisconnected(x.GameId));
             foreach (var game in connectedGames)
             {
                 if (game.PlayerTwo.Id != 0)
@@ -62,7 +73,7 @@ namespace WebAPI.SignalR
             }
 
             var availableGames = _connection.GetGames().Result;
-            var availableGamesDTO=mapper.Map<IEnumerable<GameDTO>>(availableGames);
+            var availableGamesDTO = mapper.Map<IEnumerable<GameDTO>>(availableGames);
             await Clients.All.SendAsync("getallgame", availableGamesDTO);
 
             //var connId = Context.ConnectionId;
@@ -106,13 +117,13 @@ namespace WebAPI.SignalR
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Result.Username;
-            mainGame.Id = _connection.GameCreate(mainGame).Result.gameId;
+            mainGame.GameId = _connection.GameCreate(mainGame).Result.gameId;
             var games = _connection.GetGames().Result;
-            var gameDTO=mapper.Map<GameDTO>(mainGame);
+            var gameDTO = mapper.Map<GameDTO>(mainGame);
             await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
             var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games);
             await Clients.Others.SendAsync("getallgame", gamesDTO);
-            //var waitingForOponent = new WaitingForOponent(mainGame.Id, _connection.GetActiveMatch);
+            //var waitingForOponent = new WaitingForOponent(mainGame.GameId, _connection.GetActiveMatch);
             //mainMatch = waitingForOponent.Waiting();
 
         }
@@ -122,9 +133,9 @@ namespace WebAPI.SignalR
             //int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var game = _connection.GetGameByID(gameId).Result;
-            if (game.Id != 0 && game.PlayerOne.Id == playerTwoId)
+            if (game.GameId != 0 && game.PlayerOne.Id == playerTwoId)
             {
-                await Clients.Caller.SendAsync("ongamejoin", -1, "you can not join to game which is created by you");
+                await Clients.Caller.SendAsync("ongamejoin", -1, "you can not join to game which is created by you","");
                 return;
             }
             var join = _connection.JoinToGame(gameId, playerTwoId);
@@ -133,11 +144,12 @@ namespace WebAPI.SignalR
             await GameStart(gameId);
 
 
-            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("ongamejoin", 1, "opponent connected! your turn ");
-            await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName + "`s turn");
+            await Clients.User(mainGame.PlayerOne.Id.ToString()).SendAsync("ongamejoin", 1, "opponent connected! your turn ",mainGame.PlayerOne.UserName);
+            await Clients.User(mainGame.PlayerTwo?.Id.ToString()).SendAsync("ongamejoin", 1, mainGame.PlayerOne.UserName + "`s turn",mainGame.PlayerTwo.UserName);
 
 
-            
+
+
         }
         private async Task GameStart(int gameId)
         {
@@ -147,6 +159,7 @@ namespace WebAPI.SignalR
             var gameDTO=mapper.Map<GameDTO>(mainGame);
             var gamesDTO=mapper.Map<IEnumerable<GameDTO>>(games);
             await Clients.Others.SendAsync("getallgame", gamesDTO);
+
             await Clients.Users(mainGame.PlayerOne.Id.ToString(),mainGame.PlayerTwo.Id.ToString()).SendAsync("getcurrentgame", gameDTO);
 
             await MatchStart(gameId);
@@ -160,6 +173,7 @@ namespace WebAPI.SignalR
             match.StartedAt = DateTime.Now;
             mainMatch = match;
             _connection.MatchStart(match);
+
 
 
         }
@@ -232,7 +246,7 @@ namespace WebAPI.SignalR
             Player loser = new Player();
             if (mainMatch.MatchResult.Winner != Mark.None)
             {
-                winner = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerOne : mainMatch.PlayerTwo;
+                winner = mainMatch.CurrentPlayerId == mainMatch.PlayerOne.Id ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
                 loser = winner == mainMatch.PlayerOne ? mainMatch.PlayerTwo : mainMatch.PlayerOne;
 
                 if (winner == mainMatch.PlayerOne)
@@ -257,8 +271,8 @@ namespace WebAPI.SignalR
                 mainMatch.WinnerId = -1;
                 _connection.MatchEnd(mainMatch);
                 await Clients.Users(ids).SendAsync("matchend", mainMatch.PlayerOneScore, mainMatch.PlayerTwoScore, "it is a tie");
-                await NextMatch(mainGame.Id);
-                // await MatchStart(mainGame.Id);
+                await NextMatch(mainGame.GameId);
+                // await MatchStart(mainGame.GameId);
                 return;
             }
             if (mainGame.TargetScore != mainMatch.PlayerOneScore && mainGame.TargetScore != mainMatch.PlayerTwoScore)
@@ -268,8 +282,8 @@ namespace WebAPI.SignalR
                 await Clients.User(loser.Id.ToString()).SendAsync("matchend", mainGame.PlayerOneScore, mainGame.PlayerTwoScore, "you lose the match!");
                 _connection.MatchEnd(mainMatch);
 
-                await NextMatch(mainGame.Id);
-                //await MatchStart(mainGame.Id);
+                await NextMatch(mainGame.GameId);
+                //await MatchStart(mainGame.GameId);
             }
             
             else
