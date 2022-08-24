@@ -90,8 +90,8 @@ namespace WebAPI.Core.Services
                         move.ColumnCoordinate = (int)reader["column_coordinate"];
                         moves.Add(move);
                     }
-                    //int boardSize = (int)System.Math.Sqrt(game.BoardSize);
-                    Mark[,] grid = new Mark[game.BoardSize, game.BoardSize];
+                    int boardSize = (int)System.Math.Sqrt(game.BoardSize);
+                    Mark[,] grid = new Mark[boardSize, boardSize];
                     var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
                     var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
                     playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);
@@ -457,7 +457,7 @@ namespace WebAPI.Core.Services
                             game.GameId = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
-                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_two_id"] };
+                            game.PlayerTwo = reader["_player_two_id"] is DBNull ? new Player{ Id=0} : new Player { Id = (int)reader["_player_two_id"] };
                             if (game.PlayerTwo.Id != 0)
                             {
                                 game.PlayerTwo = new Player { Id = game.PlayerTwo.Id, UserName = GetUsername(game.PlayerTwo.Id).Result.Username };
@@ -468,7 +468,7 @@ namespace WebAPI.Core.Services
                             game.StateId = (int)reader["_state_id"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
-                            game.PlayerOne = reader["_player_one_id"] is DBNull ? new Player() : new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne=reader["_player_one_id"] is DBNull ? new Player { Id = 0 } : new Player { Id = (int)reader["_player_one_id"] };
                             game.PlayerOne = new Player { Id = game.PlayerOne.Id, UserName = GetUsername(game.PlayerOne.Id).Result.Username };
                             output.Add(game);
 
