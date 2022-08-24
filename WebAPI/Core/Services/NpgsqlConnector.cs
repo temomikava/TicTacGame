@@ -90,8 +90,8 @@ namespace WebAPI.Core.Services
                         move.ColumnCoordinate = (int)reader["column_coordinate"];
                         moves.Add(move);
                     }
-                    int boardSize = (int)System.Math.Sqrt(game.BoardSize);
-                    Mark[,] grid = new Mark[boardSize, boardSize];
+                    //int boardSize = (int)System.Math.Sqrt(game.BoardSize);
+                    Mark[,] grid = new Mark[game.BoardSize, game.BoardSize];
                     var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
                     var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
                     playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);

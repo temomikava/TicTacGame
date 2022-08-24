@@ -109,11 +109,11 @@ namespace WebAPI.SignalR
         }
 
 
-        public async Task CreateGame(CreateGameRequest request)
+        public async Task CreateGame(int boardSize, int scoreTarget)
         {
-            int boardSize1 = request.BoardSize;
-            int boardSize = (int)Math.Sqrt(boardSize1);
-            int scoreTarget = request.ScoreTarget;
+            //int boardSize1 = request.BoardSize;
+            //int boardSize = (int)Math.Sqrt(boardSize1);
+            //int scoreTarget = request.ScoreTarget;
 
             //if (boardSize < 3)
             //{
@@ -132,7 +132,7 @@ namespace WebAPI.SignalR
             int playerOneId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = new Game();
             mainGame.CreatedAt = DateTime.Now;
-            mainGame.BoardSize = boardSize1;
+            mainGame.BoardSize = boardSize;
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
@@ -148,9 +148,9 @@ namespace WebAPI.SignalR
 
         }
 
-        public async Task JoinToGame(JoinToGameRequest request)
+        public async Task JoinToGame(int gameId )
         {
-            int gameId = request.GameId;
+            //int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var game = _connection.GetGameByID(gameId).Result;
             if (game.GameId != 0 && game.PlayerOne.Id == playerTwoId)
