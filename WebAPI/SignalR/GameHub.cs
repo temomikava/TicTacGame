@@ -52,8 +52,9 @@ namespace WebAPI.SignalR
             var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games.Where(x=>x.StateId==1));
             await Clients.Caller.SendAsync("getallgame", gamesDTO);
         }
-        public async Task OnReconnected(int gameId )
+        public async Task OnReconnected(OnReconnectedRequest request )
         {
+            int gameId = request.Gameid;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
 
             var game = _connection.GetGameByID(gameId).Result;
@@ -117,11 +118,11 @@ namespace WebAPI.SignalR
         }
 
 
-        public async Task CreateGame(int boardSize, int scoreTarget)
+        public async Task CreateGame(CreateGameRequest request)
         {
-            //int boardSize1 = request.BoardSize;
-            //int boardSize = (int)Math.Sqrt(boardSize1);
-            //int scoreTarget = request.ScoreTarget;
+            int boardSize1 = request.BoardSize;
+            int boardSize = (int)Math.Sqrt(boardSize1);
+            int scoreTarget = request.ScoreTarget;
 
             //if (boardSize < 3)
             //{
@@ -140,13 +141,13 @@ namespace WebAPI.SignalR
             int playerOneId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = new Game();
             mainGame.CreatedAt = DateTime.Now;
-            mainGame.BoardSize = boardSize;
+            mainGame.BoardSize = boardSize1;
             mainGame.TargetScore = scoreTarget;
             mainGame.StateId = (int)StateType.Created;
             mainGame.PlayerOne = new Player { Id = playerOneId };
             mainGame.PlayerOne.UserName = _connection.GetUsername(playerOneId).Result.Username;
             mainGame.GameId = _connection.GameCreate(mainGame).Result.gameId;
-            var games = _connection.GetGames().Result;
+            var games = _connection.GetGames().Result.Where(x=>x.StateId==(int)StateType.Created);
             var gameDTO = mapper.Map<GameDTO>(mainGame);
             await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
             var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games);
@@ -156,12 +157,17 @@ namespace WebAPI.SignalR
 
         }
 
-        public async Task JoinToGame(int gameId )
-        {
-            //int gameId = request.GameId;
+        public async Task JoinToGame(JoinToGameRequest request )
+        {           
+            int gameId = request.GameId;
             int playerTwoId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             var game = _connection.GetGameByID(gameId).Result;
-            if (game.GameId != 0 && game.PlayerOne.Id == playerTwoId)
+            if (game==null)
+            {
+                await Clients.Caller.SendAsync("ongamejoin", -1, "game not found", "");
+                return;
+            }
+            if (game.PlayerOne.Id == playerTwoId)
             {
                 await Clients.Caller.SendAsync("ongamejoin", -1, "you can not join to game which is created by you", "");
                 return;
@@ -185,7 +191,7 @@ namespace WebAPI.SignalR
             mainGame = _connection.GetGameByID(gameId).Result;
             var games = _connection.GetGames().Result;
             var gameDTO = mapper.Map<GameDTO>(mainGame);
-            var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games.Where(x=>x.StateId==1));
+            var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games.Where(x=>x.StateId==(int)StateType.Created));
             await Clients.Others.SendAsync("getallgame", gamesDTO);
 
             await Clients.Users(mainGame.PlayerOne.Id.ToString(), mainGame.PlayerTwo.Id.ToString()).SendAsync("getcurrentgame", gameDTO);
@@ -215,11 +221,11 @@ namespace WebAPI.SignalR
             await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn", -1, -1, "");
         }
 
-        public async Task MakeMove(int gameId, int r, int c)
+        public async Task MakeMove(MakeMoveRequest request)
         {
-            //int gameId = request.GameId;
-            //int r = request.Row;
-            //int c = request.Column;
+            int gameId = request.GameId;
+            int r = request.Row;
+            int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = _connection.GetGameByID(gameId).Result;
             mainMatch = _connection.GetActiveMatch(gameId).Result;

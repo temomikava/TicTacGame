@@ -90,8 +90,8 @@ namespace WebAPI.Core.Services
                         move.ColumnCoordinate = (int)reader["column_coordinate"];
                         moves.Add(move);
                     }
-                    //int boardSize = (int)System.Math.Sqrt(game.BoardSize);
-                    Mark[,] grid = new Mark[game.BoardSize,game.BoardSize];
+                    int boardSize = (int)System.Math.Sqrt(game.BoardSize);
+                    Mark[,] grid = new Mark[boardSize,boardSize];
                     var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
                     var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
                     playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);
@@ -404,7 +404,6 @@ namespace WebAPI.Core.Services
             {
                 try
                 {
-                    var game = new Game();
                     using (var cmd = new NpgsqlCommand("get_game_by_id", connection) { CommandType = CommandType.StoredProcedure })
                     {
                         cmd.Parameters.AddWithValue("_game_id", gameId);
@@ -412,6 +411,7 @@ namespace WebAPI.Core.Services
                         NpgsqlDataReader reader = await cmd.ExecuteReaderAsync();
                         while (await reader.ReadAsync())
                         {
+                            var game= new Game();
                             game.GameId = (int)reader["_id"];
                             game.CreatedAt = (DateTime)reader["_created_at"];
                             game.StartedAt = reader["_started_at"] is DBNull ? null : (DateTime)reader["_started_at"];
@@ -425,10 +425,9 @@ namespace WebAPI.Core.Services
                             game.TargetScore = (int)reader["_target_score"];
                             game.PlayerOne = new Player { Id = (int)reader["_player_one_id"] };
                             game.PlayerOne.UserName = GetUsername(game.PlayerOne.Id).Result.Username;
+                            return game;
                         }
-
-                        return game;
-
+                        return null;
                     }
                 }
                 catch (Exception)
