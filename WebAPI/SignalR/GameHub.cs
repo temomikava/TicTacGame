@@ -72,6 +72,20 @@ namespace WebAPI.SignalR
             List<Game> connectedGames = new List<Game>();
             games.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id).ToList().ForEach(x => connectedGames.Add(x));
             var notStartedGames = connectedGames.Where(x => x.StateId == (int)StateType.Created).ToList();
+            var waiterGames = games.Where(x => x.StateId == (int)StateType.WaitingForReconnect).ToList();
+            var relatedGames=waiterGames.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id).ToList();
+            foreach (var game in relatedGames)
+            {
+                var match = _connection.GetActiveMatch(game.GameId).Result;
+                match.PlayerOne = game.PlayerOne;
+                match.PlayerTwo = game.PlayerTwo;
+                match.WinnerId = match.CurrentPlayerId == id ? match.PlayerTwo.Id : match.PlayerOne.Id;              
+                _connection.MatchEnd(match);
+                game.Winner_Player_id = match.WinnerId;
+                game.StateId = (int)StateType.Finished;
+                _connection.GameEnd(game);
+            }
+            
 
             notStartedGames.ForEach(x => _connection.Ondisconnected(x.GameId));
             var startedGames = connectedGames.Where(x => x.StateId == (int)StateType.Started).ToList();
@@ -201,11 +215,11 @@ namespace WebAPI.SignalR
             await Clients.User(mainGame.PlayerTwo.Id.ToString()).SendAsync("nextturn", 1, mainGame.PlayerOne.UserName + "`s turn", -1, -1, "");
         }
 
-        public async Task MakeMove(MakeMoveRequest request)
+        public async Task MakeMove(int gameId, int r, int c)
         {
-            int gameId = request.GameId;
-            int r = request.Row;
-            int c = request.Column;
+            //int gameId = request.GameId;
+            //int r = request.Row;
+            //int c = request.Column;
             int callerId = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             mainGame = _connection.GetGameByID(gameId).Result;
             mainMatch = _connection.GetActiveMatch(gameId).Result;
