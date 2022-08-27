@@ -24,6 +24,7 @@ namespace WebAPI.Core.Interface
         public Task Ondisconnected(int gameId);
         public Task WaitingForReconnect(int gameId,int stateId);
         public Task<int[]> GetMovesHistory(int gameId);
+        public Task UpdateBoardState(int[] moves,int matchId); 
 
 
 

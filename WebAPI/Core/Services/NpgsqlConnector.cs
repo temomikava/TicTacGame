@@ -90,8 +90,8 @@ namespace WebAPI.Core.Services
                         move.ColumnCoordinate = (int)reader["column_coordinate"];
                         moves.Add(move);
                     }
-                    //int boardSize = (int)System.Math.Sqrt(game.BoardSize);
-                    Mark[,] grid = new Mark[game.BoardSize,game.BoardSize];
+                    int boardSize = (int)System.Math.Sqrt(game.BoardSize);
+                    Mark[,] grid = new Mark[boardSize,boardSize];
                     var playerOneMoves = moves.Where(x => x.PlayerId == game.PlayerOne.Id).ToList();
                     var playerTwoMoves = moves.Where(x => x.PlayerId == game.PlayerTwo.Id).ToList();
                     playerOneMoves.ForEach(x => grid[x.RowCoordinate, x.ColumnCoordinate] = Mark.X);
@@ -562,15 +562,27 @@ namespace WebAPI.Core.Services
             return  output.ToArray();
         }
 
+        public async Task UpdateBoardState(int[] moves, int matchId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("updateboardstate", connection) { CommandType = CommandType.StoredProcedure })
+                    {
 
+                        cmd.Parameters.AddWithValue("_matchid", matchId);
+                        cmd.Parameters.AddWithValue("_moves", moves);
+                        connection.Open();
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+                catch (Exception)
+                {
 
-
-        //public (int Error, string ErrorMessage) StartGame(Game mainGame)
-        //{
-        //    GameLibrary.Game startGame = new GameLibrary.Game();
-        //    return startGame.MakeMove(2, 1);
-
-        //}
-
+                    throw;
+                }
+            }
+        }
     }
 }
