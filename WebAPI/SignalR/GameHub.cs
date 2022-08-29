@@ -87,80 +87,103 @@ namespace WebAPI.SignalR
             }
 
             //--after timer
-
-            await Task.Delay(20000);
-
-
-            connectedGames = _connection.GetGames().Result.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
-
-            connectedGames.Where(x => x.PlayerTwo.Id == 0 && x.StateId == (int)StateType.noOneConnected).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.Cancelled));
-
-            var notStartedConnectedGames = connectedGames.Where(x => x.PlayerTwo.Id != 0 && (x.StateId == (int)StateType.OneIsConnected || x.StateId == (int)StateType.noOneConnected)).ToList();
-
-
-            if (notStartedConnectedGames.Count() > 0)
+            int i = 0;
+            while (!_users.ContainsKey(id))
             {
-                foreach (var game in notStartedConnectedGames)
+                await Task.Delay(1000);
+                i++;
+                if (i==20)
                 {
-                    var match = _connection.GetActiveMatch(game.GameId).Result;
-                    match.PlayerOne = game.PlayerOne;
-                    match.PlayerTwo = game.PlayerTwo;
-
-                    int opponentId = id == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
-                    if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.noOneConnected)
+                    connectedGames.Where(x => x.PlayerTwo.Id == 0).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.Cancelled));
+                    foreach (var game in connectedGames.Where(x=>x.PlayerTwo.Id!=0))
                     {
-                        var interval1 = _connection.GetDisconnectionInterval(opponentId).Result;
-                        var interval2 = _connection.GetDisconnectionInterval(id).Result;
-                        
-                        if (interval1 > 19000 && interval2 < 19000)
-                        {
-                            match.WinnerId = id;
-                            game.Winner_Player_id = id;
-                        }
-                        else if (interval2 > 19000 && interval1 < 19000)
-                        {
-                            match.WinnerId = opponentId;
-                            game.Winner_Player_id = opponentId;
-                        }
-                        else if (interval1 < 19000 && interval2 < 19000)
-                        {
-                            goto StartupBase;
-                        }
+                        var match = _connection.GetActiveMatch(game.GameId).Result;
+                        var opponentId = game.PlayerOne.Id == id ? game.PlayerTwo.Id : game.PlayerOne.Id;
+                        match.WinnerId = opponentId;
+                        game.Winner_Player_id = opponentId;
+                        _connection.MatchEnd(match);
+                        _connection.GameEnd(game);
+                        await Clients.User(opponentId.ToString()).SendAsync("gameend",game.GameId,game.PlayerOneScore,game.PlayerOneScore,"opponent disconneced, so you are a winner");
+                        var availableGames = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
+                        var gamesDTOS = mapper.Map<IEnumerable<GameDTO>>(availableGames);
+                        await Clients.All.SendAsync("getallgame", gamesDTOS);
                     }
-                    if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.OneIsConnected)
-                    {
-                        int activeUserId = _users.ContainsKey(game.PlayerOne.Id) ? game.PlayerOne.Id : game.PlayerTwo.Id;
-                        int notActiveUserId = activeUserId == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
-                        var interval = _connection.GetDisconnectionInterval(notActiveUserId).Result;
-                        if (interval > 19000)
-                        {
-                            match.WinnerId = activeUserId;
-                            game.Winner_Player_id = activeUserId;
-                            await Clients.User(activeUserId.ToString()).SendAsync("gameend",  game.GameId, game.PlayerOneScore, game.PlayerTwoScore, "opponent disconnected, you are a winner");
-                        }
-                        else
-                        {
-                            goto StartupBase;
-                        }
-                    }
-
-
-                    _connection.MatchEnd(match);
-                    game.StateId = (int)StateType.Finished;
-                    _connection.GameEnd(game);
-
+                    return;
                 }
-
             }
-        StartupBase:
-            var availableGames = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
-            var gamesDTOS = mapper.Map<IEnumerable<GameDTO>>(availableGames);
-            await Clients.All.SendAsync("getallgame", gamesDTOS);
+
+            await base.OnDisconnectedAsync(exception);
+
+
+            //    connectedGames = _connection.GetGames().Result.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
+
+            //    connectedGames.Where(x => x.PlayerTwo.Id == 0 && x.StateId == (int)StateType.noOneConnected).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.Cancelled));
+
+            //    var notStartedConnectedGames = connectedGames.Where(x => x.PlayerTwo.Id != 0 && (x.StateId == (int)StateType.OneIsConnected || x.StateId == (int)StateType.noOneConnected)).ToList();
+
+
+            //    if (notStartedConnectedGames.Count() > 0)
+            //    {
+            //        foreach (var game in notStartedConnectedGames)
+            //        {
+            //            var match = _connection.GetActiveMatch(game.GameId).Result;
+            //            match.PlayerOne = game.PlayerOne;
+            //            match.PlayerTwo = game.PlayerTwo;
+
+            //            int opponentId = id == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
+            //            if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.noOneConnected)
+            //            {
+            //                var interval1 = _connection.GetDisconnectionInterval(opponentId).Result;
+            //                var interval2 = _connection.GetDisconnectionInterval(id).Result;
+
+            //                if (interval1 > 19000 && interval2 < 19000)
+            //                {
+            //                    match.WinnerId = id;
+            //                    game.Winner_Player_id = id;
+            //                }
+            //                else if (interval2 > 19000 && interval1 < 19000)
+            //                {
+            //                    match.WinnerId = opponentId;
+            //                    game.Winner_Player_id = opponentId;
+            //                }
+            //                else if (interval1 < 19000 && interval2 < 19000)
+            //                {
+            //                    goto StartupBase;
+            //                }
+            //            }
+            //            if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.OneIsConnected)
+            //            {
+            //                int activeUserId = _users.ContainsKey(game.PlayerOne.Id) ? game.PlayerOne.Id : game.PlayerTwo.Id;
+            //                int notActiveUserId = activeUserId == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
+            //                var interval = _connection.GetDisconnectionInterval(notActiveUserId).Result;
+            //                if (interval > 19000)
+            //                {
+            //                    match.WinnerId = activeUserId;
+            //                    game.Winner_Player_id = activeUserId;
+            //                    await Clients.User(activeUserId.ToString()).SendAsync("gameend", game.GameId, game.PlayerOneScore, game.PlayerTwoScore, "opponent disconnected, you are a winner");
+            //                }
+            //                else
+            //                {
+            //                    goto StartupBase;
+            //                }
+            //            }
+
+
+            //            _connection.MatchEnd(match);
+            //            game.StateId = (int)StateType.Finished;
+            //            _connection.GameEnd(game);
+
+            //        }
+
+            //    }
+            //StartupBase:
+            //var availableGames = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
+            //var gamesDTOS = mapper.Map<IEnumerable<GameDTO>>(availableGames);
+            //await Clients.All.SendAsync("getallgame", gamesDTOS);
 
             //--after timer
 
 
-            await base.OnDisconnectedAsync(exception);
         }
 
 
