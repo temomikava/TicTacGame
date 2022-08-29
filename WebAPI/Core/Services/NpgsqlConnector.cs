@@ -487,7 +487,7 @@ namespace WebAPI.Core.Services
             }
         }
 
-        public async Task Ondisconnected(int gameId)
+        public async Task Ondisconnected(int playerId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
             {
@@ -495,8 +495,29 @@ namespace WebAPI.Core.Services
                 {
                     using (var cmd = new NpgsqlCommand("ondisconncted", connection) { CommandType = CommandType.StoredProcedure })
                     {
-                        cmd.Parameters.AddWithValue("_gameid", gameId);
-                        cmd.Parameters.AddWithValue("_stateid", (int)StateType.Cancelled);
+                        cmd.Parameters.AddWithValue("_player_id", playerId);
+                        connection.Open();
+                        await cmd.ExecuteNonQueryAsync();
+
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+        public async Task OnConnected(int playerId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("onconnected", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_player_id", playerId);
                         connection.Open();
                         await cmd.ExecuteNonQueryAsync();
 
@@ -581,6 +602,32 @@ namespace WebAPI.Core.Services
                 {
 
                     throw;
+                }
+            }
+        }
+
+        public async Task<long> GetDisconnectionInterval(int playerId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("get_disconnection_interval", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+
+                        cmd.Parameters.AddWithValue("_playerid", playerId);
+                        connection.Open();
+                        var time= await cmd.ExecuteScalarAsync();
+                        var parsedTime = (DateTime)time;
+                        var date = DateTime.Now;
+                        var interval = date - parsedTime;
+                        return (long)interval.TotalMilliseconds;
+                        
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
                 }
             }
         }

@@ -21,11 +21,12 @@ namespace WebAPI.Core.Interface
         public Task<Game> GetGameByID(int gameId);
         public void MakeMove(Match match, int r, int c);
         public  Task<Mark[,]> FillGrid(Match match);
-        public Task Ondisconnected(int gameId);
+        public Task Ondisconnected(int playerId);
+        public Task OnConnected(int playerId);
         public Task WaitingForReconnect(int gameId,int stateId);
         public Task<int[]> GetMovesHistory(int gameId);
         public Task UpdateBoardState(int[] moves,int matchId); 
-
+        public Task<long> GetDisconnectionInterval(int playerId);    
 
 
 
