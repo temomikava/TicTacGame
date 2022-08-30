@@ -23,7 +23,7 @@ namespace WebAPI.SignalR
             _connection = connection;
             this.mapper = mapper;
         }
-        private static ConcurrentDictionary<int, HashSet<string>> _users = new ConcurrentDictionary<int, HashSet<string>>();
+        private static ConcurrentDictionary<int, HashSet<string>> _activeUsers = new ConcurrentDictionary<int, HashSet<string>>();
         //private static ConcurrentDictionary<int, HashSet<Match>> _games = new ConcurrentDictionary<int, HashSet<Match>>();
 
         public override async Task OnConnectedAsync()
@@ -31,13 +31,13 @@ namespace WebAPI.SignalR
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
             string connid = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             await _connection.OnConnected(id);
-            if (_users.ContainsKey(id))
+            if (_activeUsers.ContainsKey(id))
             {
-                _users[id].Add(connid);
+                _activeUsers[id].Add(connid);
             }
             else
             {
-                _users.TryAdd(id, new HashSet<string>() { connid });
+                _activeUsers.TryAdd(id, new HashSet<string>() { connid });
             }
             var relatedgames = _connection.GetGames().Result.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
 
@@ -77,31 +77,32 @@ namespace WebAPI.SignalR
             connectedGames.Where(x => x.StateId == (int)StateType.Started).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.OneIsConnected));
 
 
-            if (_users[id].Count > 1)
+            if (_activeUsers[id].Count > 1)
             {
-                _users[id].Remove(connId);
+                _activeUsers[id].Remove(connId);
             }
             else
             {
-                _users.Remove(id, out var _);
+                _activeUsers.Remove(id, out var _);
             }
 
-            //--after timer
             int i = 0;
-            while (!_users.ContainsKey(id))
+            while (!_activeUsers.ContainsKey(id))
             {
                 await Task.Delay(1000);
                 i++;
                 if (i==20)
                 {
+                    connectedGames = _connection.GetGames().Result.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
                     connectedGames.Where(x => x.PlayerTwo.Id == 0).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.Cancelled));
-                    foreach (var game in connectedGames.Where(x=>x.PlayerTwo.Id!=0))
+                    foreach (var game in connectedGames.Where(x => x.PlayerTwo.Id != 0 && x.StateId != (int)StateType.Finished))
                     {
                         var match = _connection.GetActiveMatch(game.GameId).Result;
                         var opponentId = game.PlayerOne.Id == id ? game.PlayerTwo.Id : game.PlayerOne.Id;
                         match.WinnerId = opponentId;
                         game.Winner_Player_id = opponentId;
                         _connection.MatchEnd(match);
+                        game.StateId = (int)StateType.Finished;
                         _connection.GameEnd(game);
                         await Clients.User(opponentId.ToString()).SendAsync("gameend",game.GameId,game.PlayerOneScore,game.PlayerOneScore,"opponent disconneced, so you are a winner");
                         var availableGames = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
@@ -113,77 +114,7 @@ namespace WebAPI.SignalR
             }
 
             await base.OnDisconnectedAsync(exception);
-
-
-            //    connectedGames = _connection.GetGames().Result.Where(x => x.PlayerOne.Id == id || x.PlayerTwo.Id == id);
-
-            //    connectedGames.Where(x => x.PlayerTwo.Id == 0 && x.StateId == (int)StateType.noOneConnected).ToList().ForEach(x => _connection.WaitingForReconnect(x.GameId, (int)StateType.Cancelled));
-
-            //    var notStartedConnectedGames = connectedGames.Where(x => x.PlayerTwo.Id != 0 && (x.StateId == (int)StateType.OneIsConnected || x.StateId == (int)StateType.noOneConnected)).ToList();
-
-
-            //    if (notStartedConnectedGames.Count() > 0)
-            //    {
-            //        foreach (var game in notStartedConnectedGames)
-            //        {
-            //            var match = _connection.GetActiveMatch(game.GameId).Result;
-            //            match.PlayerOne = game.PlayerOne;
-            //            match.PlayerTwo = game.PlayerTwo;
-
-            //            int opponentId = id == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
-            //            if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.noOneConnected)
-            //            {
-            //                var interval1 = _connection.GetDisconnectionInterval(opponentId).Result;
-            //                var interval2 = _connection.GetDisconnectionInterval(id).Result;
-
-            //                if (interval1 > 19000 && interval2 < 19000)
-            //                {
-            //                    match.WinnerId = id;
-            //                    game.Winner_Player_id = id;
-            //                }
-            //                else if (interval2 > 19000 && interval1 < 19000)
-            //                {
-            //                    match.WinnerId = opponentId;
-            //                    game.Winner_Player_id = opponentId;
-            //                }
-            //                else if (interval1 < 19000 && interval2 < 19000)
-            //                {
-            //                    goto StartupBase;
-            //                }
-            //            }
-            //            if (notStartedConnectedGames.Where(x => x.GameId == game.GameId).Single().StateId == (int)StateType.OneIsConnected)
-            //            {
-            //                int activeUserId = _users.ContainsKey(game.PlayerOne.Id) ? game.PlayerOne.Id : game.PlayerTwo.Id;
-            //                int notActiveUserId = activeUserId == game.PlayerOne.Id ? game.PlayerTwo.Id : game.PlayerOne.Id;
-            //                var interval = _connection.GetDisconnectionInterval(notActiveUserId).Result;
-            //                if (interval > 19000)
-            //                {
-            //                    match.WinnerId = activeUserId;
-            //                    game.Winner_Player_id = activeUserId;
-            //                    await Clients.User(activeUserId.ToString()).SendAsync("gameend", game.GameId, game.PlayerOneScore, game.PlayerTwoScore, "opponent disconnected, you are a winner");
-            //                }
-            //                else
-            //                {
-            //                    goto StartupBase;
-            //                }
-            //            }
-
-
-            //            _connection.MatchEnd(match);
-            //            game.StateId = (int)StateType.Finished;
-            //            _connection.GameEnd(game);
-
-            //        }
-
-            //    }
-            //StartupBase:
-            //var availableGames = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
-            //var gamesDTOS = mapper.Map<IEnumerable<GameDTO>>(availableGames);
-            //await Clients.All.SendAsync("getallgame", gamesDTOS);
-
-            //--after timer
-
-
+          
         }
 
 
@@ -202,7 +133,8 @@ namespace WebAPI.SignalR
             mainGame.GameId = _connection.GameCreate(mainGame).Result.gameId;
             var games = _connection.GetGames().Result.Where(x => x.StateId == (int)StateType.Created);
             var gameDTO = mapper.Map<GameDTO>(mainGame);
-            await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
+            //await Clients.Caller.SendAsync("getcurrentgame", gameDTO);
+            //await Clients.Caller.SendAsync("ongamecreate", "created",mainGame.GameId);
 
             var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games);
             await Clients.All.SendAsync("getallgame", gamesDTO);
@@ -251,14 +183,17 @@ namespace WebAPI.SignalR
         }
         private async Task GameStart(int gameId)
         {
+            int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
+
             _connection.GameStart(gameId);
             mainGame = _connection.GetGameByID(gameId).Result;
             var games = _connection.GetGames().Result;
             var gameDTO = mapper.Map<GameDTO>(mainGame);
             var gamesDTO = mapper.Map<IEnumerable<GameDTO>>(games.Where(x => x.StateId == (int)StateType.Created));
             await Clients.All.SendAsync("getallgame", gamesDTO);
-
-            await Clients.Users(mainGame.PlayerOne.Id.ToString(), mainGame.PlayerTwo.Id.ToString()).SendAsync("getcurrentgame", gameDTO);
+            var opponentId = mainGame.PlayerOne.Id == id ? mainGame.PlayerTwo.Id : mainGame.PlayerOne.Id;
+            await Clients.Caller.SendAsync("getcurrentgame", gameDTO,id);
+            await Clients.Users(opponentId.ToString()).SendAsync("getcurrentgame", gameDTO,opponentId);
 
             await MatchStart(gameId);
         }

@@ -3,12 +3,12 @@ namespace GameLibrary
 {
     public class Match:Game
     {
-        public new int  Id { get; set; }
+        public int  Id { get; set; }
         public new int StateId { get; set; }
         public int WinnerId { get; set; }
         public new int PlayerOneScore { get; set; } = 0;
         public new int PlayerTwoScore { get; set; } = 0;
-        public int GameId { get; set; }
+        public new int GameId { get; set; }
         public Mark CurrentPlayer { get;  set; } = Mark.X;
         public int CurrentPlayerId { get; set; }
         public int TurnsPassed { get;  set; } = 0;
