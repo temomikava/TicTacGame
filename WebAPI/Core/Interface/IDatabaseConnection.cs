@@ -6,7 +6,7 @@ namespace WebAPI.Core.Interface
 {
     public interface IDatabaseConnection
     {
-        (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization);
+       (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization);
         (int Error, string ErrorMessage) Registration(RegistrationModel registration);
         Task<(int erorrCode, string message, int gameId)> GameCreate(Game game);
         int GetUserId(Guid sessionId);
@@ -22,11 +22,12 @@ namespace WebAPI.Core.Interface
         public void MakeMove(Match match, int r, int c);
         public  Task<Mark[,]> FillGrid(Match match);
         public Task Ondisconnected(int playerId);
-        public Task OnConnected(int playerId);
         public Task WaitingForReconnect(int gameId,int stateId);
         public Task<int[]> GetMovesHistory(int gameId);
-        public Task UpdateBoardState(int[] moves,int matchId); 
-        public Task<long> GetDisconnectionInterval(int playerId);    
+        public Task UpdateBoardState(int[] moves,int matchId);
+        public  Task OnConnected(int playerId);
+
+
 
 
 

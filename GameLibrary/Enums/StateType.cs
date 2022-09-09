@@ -1,8 +1,7 @@
 ﻿namespace GameLibrary
 {
     public enum StateType
-    {
-        Created=1, Started, Finished, Cancelled,OneIsConnected,noOneConnected
-
+    {        
+        Created=1, Started, Finished, Cancelled,PlayerOneIsConnected,PlayerTwoIsConnected,NoOneIsConnected
     }
 }
