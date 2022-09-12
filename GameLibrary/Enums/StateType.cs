@@ -2,6 +2,6 @@
 {
     public enum StateType
     {        
-        Created=1, Started, Finished, Cancelled,PlayerOneIsConnected,PlayerTwoIsConnected,NoOneIsConnected
-    }
+        Created=1, Started, Finished, Cancelled,PlayerOneIsConnected,PlayerTwoIsConnected,NoOneIsConnected        
+    }    
 }

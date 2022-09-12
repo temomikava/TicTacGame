@@ -26,16 +26,5 @@ namespace WebAPI.Core.Interface
         public Task<int[]> GetMovesHistory(int gameId);
         public Task UpdateBoardState(int[] moves,int matchId);
         public  Task OnConnected(int playerId);
-
-
-
-
-
-
-
-
-
-
-
     }
 }
