@@ -11,7 +11,6 @@ namespace GameLibrary
     {
         public int GameId { get; set; }
         public Mark[,] GameGrid { get; set; }
-        public List<Match> MatchList { get; set; }=new ();
         public DateTime? CreatedAt { get; set; }
         public DateTime? StartedAt { get; set; } = null;
         public DateTime? FinishedAt { get; set; } = null;
@@ -23,5 +22,6 @@ namespace GameLibrary
         public int Winner_Player_id { get; set; }
         public int TargetScore { get; set; }
         public int BoardSize { get; set; }
+
     }
 }

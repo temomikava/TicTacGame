@@ -13,7 +13,8 @@ namespace WebAPI
         public int Winner_Player_id { get; set; }
         public int TargetScore { get; set; }
         public int BoardSize { get; set; }
-       
+        public List<MatchDTO> Matches { get; set; } = new();
+
     }
 }
 

@@ -266,6 +266,90 @@ namespace WebAPI.Core.Services
             }
 
         }
+        public async Task<List<Game>> GetGamesHistory(int playerId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    List<Game> games = new List<Game>();
+                    using (var cmd = new NpgsqlCommand("get_last_5_game", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("_playerid", playerId);
+                        
+                        connection.Open();
+                        var reader = cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            Game game = new Game();
+                            game.GameId = (int)reader["_id"];
+                            game.CreatedAt = (DateTime)reader["_created_at"];
+                            game.StartedAt= (DateTime)reader["_started_at"];
+                            game.StateId= (int)reader["_state_id"];
+                            game.PlayerOne = new Player { Id = (int)reader["_player_one_id"] };
+                            game.PlayerOne = new Player { Id = (int)reader["_player_one_id"], UserName = GetUsername(game.PlayerOne.Id).Result.Username };
+                            game.PlayerTwo = new Player { Id = (int)reader["_player_two_id"] };
+                            game.PlayerTwo = new Player { Id = (int)reader["_player_two_id"], UserName = GetUsername(game.PlayerTwo.Id).Result.Username };
+                            game.PlayerOneScore = (int)reader["_player_one_score"];
+                            game.PlayerTwoScore = (int)reader["_player_two_score"];
+                            game.BoardSize = (int)reader["_board_size"];
+                            game.TargetScore = (int)reader["_target_score"];
+                            games.Add(game);
+                            
+                        }
+                        return  games;
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+        public List<MatchDTO> GetMatchesHistory(int gameId)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    List<MatchDTO> matches = new List<MatchDTO>();
+                    using (var cmd = new NpgsqlCommand("get_all_matches", connection) { CommandType = CommandType.StoredProcedure })
+                    {
+                        cmd.Parameters.AddWithValue("__gameid", gameId);
+
+                        connection.Open();
+                        var reader = cmd.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            MatchDTO match = new MatchDTO();
+                            match.Id = (int)reader["_id"];
+                            match.WinnerId = (int)reader["_winnerid"];
+                            match.StartedAt = (DateTime)reader["_started_at"];
+                            match.FinishedAt = (DateTime)reader["_finishedat"];
+                            match.GameId = (int)reader["_gameid"];
+                            match.StateId = (int)reader["_stateid"];
+                            match.TurnsPassed = (int)reader["_turnspassed"];
+                            match.BoardState = reader["_boardstate"] is DBNull ? null : (int[])reader["_boardstate"];
+                            
+                            matches.Add(match);
+
+                        }
+                        return matches;
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            }
+
+        }
+
         public (int ErrorCode, string ErrorMessage) MatchEnd(Match match)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
