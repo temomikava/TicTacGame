@@ -19,6 +19,69 @@ namespace WebAPI.Core.Services
             _configuration = config;
             _connectionString = _configuration.GetConnectionString("myConnection").Trim();
         }
+        
+        public (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure };
+                    var a = cmd.Parameters.AddWithValue("_username", authorization.UserName);
+                    cmd.Parameters.AddWithValue("_password", authorization.Password);
+                    cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
+                    connection.Open();
+                    var sessionId = (Guid?)cmd.ExecuteScalar();
+
+                    return (1, "done", sessionId);
+                }
+
+                catch (Exception e)
+                {
+                    return (-1, e.Message, null);
+                }
+            }
+        }
+        public (int Error, string ErrorMessage) Registration(RegistrationModel registration)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                try
+                {
+                    var cmd = new NpgsqlCommand("player_registration", connection) { CommandType = CommandType.StoredProcedure };
+                    cmd.Parameters.AddWithValue("_firstname", registration.FirstName);
+                    cmd.Parameters.AddWithValue("_lastname", registration.LastName);
+                    cmd.Parameters.AddWithValue("_username", registration.UserName);
+                    cmd.Parameters.AddWithValue("_password", registration.Password);
+                    if (registration.FirstName.Length < 3)
+                    {
+                        return (0, "firstname must include minimum 3 symbols");
+                    }
+                    if (registration.LastName.Length < 3)
+                    {
+                        return (0, "lastname must include minimum 3 symbols");
+                    }
+                    if (registration.UserName.Length < 3)
+                    {
+                        return (0, "username must include minimum 3 symbols");
+                    }
+                    if (registration.Password.Length < 6)
+                    {
+                        return (0, "password must include minimum 6 symbols");
+                    }
+
+                    connection.Open();
+                    cmd.ExecuteNonQuery();
+
+                    return (1, "done");
+                }
+
+                catch (Exception e)
+                {
+                    return (-1, e.Message);
+                }
+            }
+        }
         public int GetUserId(Guid sessionId)
         {
             using (var connection = new NpgsqlConnection(_connectionString))
@@ -42,28 +105,6 @@ namespace WebAPI.Core.Services
                 catch (Exception)
                 {
                     return -1;
-                }
-            }
-        }
-        public (int ErrorCode, string ErrorMessage, Guid? SessionId) Authorization(AuthorizationModel authorization)
-        {
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                try
-                {
-                    var cmd = new NpgsqlCommand("player_login", connection) { CommandType = CommandType.StoredProcedure };
-                    var a = cmd.Parameters.AddWithValue("_username", authorization.UserName);
-                    cmd.Parameters.AddWithValue("_password", authorization.Password);
-                    cmd.Parameters.Add("_session_id", NpgsqlDbType.Uuid).Direction = ParameterDirection.Output;
-                    connection.Open();
-                    var sessionId = (Guid?)cmd.ExecuteScalar();
-
-                    return (1, "done", sessionId);
-                }
-
-                catch (Exception e)
-                {
-                    return (-1, e.Message, null);
                 }
             }
         }
@@ -173,46 +214,7 @@ namespace WebAPI.Core.Services
         }
 
 
-        public (int Error, string ErrorMessage) Registration(RegistrationModel registration)
-        {
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                try
-                {
-                    var cmd = new NpgsqlCommand("player_registration", connection) { CommandType = CommandType.StoredProcedure };
-                    cmd.Parameters.AddWithValue("_firstname", registration.FirstName);
-                    cmd.Parameters.AddWithValue("_lastname", registration.LastName);
-                    cmd.Parameters.AddWithValue("_username", registration.UserName);
-                    cmd.Parameters.AddWithValue("_password", registration.Password);
-                    if (registration.FirstName.Length < 3)
-                    {
-                        return (0, "firstname must include minimum 3 symbols");
-                    }
-                    if (registration.LastName.Length < 3)
-                    {
-                        return (0, "lastname must include minimum 3 symbols");
-                    }
-                    if (registration.UserName.Length < 3)
-                    {
-                        return (0, "username must include minimum 3 symbols");
-                    }
-                    if (registration.Password.Length < 6)
-                    {
-                        return (0, "password must include minimum 6 symbols");
-                    }
-
-                    connection.Open();
-                    cmd.ExecuteNonQuery();
-
-                    return (1, "done");
-                }
-
-                catch (Exception e)
-                {
-                    return (-1, e.Message);
-                }
-            }
-        }
+       
 
         public (int ErrorCode, string ErrorMessage) GameStart(int gameId)
         {
@@ -290,8 +292,8 @@ namespace WebAPI.Core.Services
                             game.PlayerOne = new Player { Id = (int)reader["_player_one_id"], UserName = GetUsername(game.PlayerOne.Id).Result.Username };
                             game.PlayerTwo = new Player { Id = (int)reader["_player_two_id"] };
                             game.PlayerTwo = new Player { Id = (int)reader["_player_two_id"], UserName = GetUsername(game.PlayerTwo.Id).Result.Username };
-                            game.PlayerOneScore = (int)reader["_player_one_score"];
-                            game.PlayerTwoScore = (int)reader["_player_two_score"];
+                            game.PlayerOneScore = reader["_player_one_score"] is DBNull ? 0 : (int)reader["_player_one_score"];
+                            game.PlayerTwoScore = reader["_player_two_score"] is DBNull ? 0 : (int)reader["_player_two_score"];
                             game.BoardSize = (int)reader["_board_size"];
                             game.TargetScore = (int)reader["_target_score"];
                             games.Add(game);
@@ -326,12 +328,12 @@ namespace WebAPI.Core.Services
                         {
                             MatchDTO match = new MatchDTO();
                             match.Id = (int)reader["_id"];
-                            match.WinnerId = (int)reader["_winnerid"];
-                            match.StartedAt = (DateTime)reader["_started_at"];
-                            match.FinishedAt = (DateTime)reader["_finishedat"];
+                            match.WinnerId = reader["_winnerid"] is DBNull ? -1 : (int)reader["_winnerid"];
+                            //match.StartedAt = (DateTime)reader["_started_at"];
+                            //match.FinishedAt = (DateTime)reader["_finishedat"];
                             match.GameId = (int)reader["_gameid"];
-                            match.StateId = (int)reader["_stateid"];
-                            match.TurnsPassed = (int)reader["_turnspassed"];
+                            //match.StateId = (int)reader["_stateid"];
+                            //match.TurnsPassed = (int)reader["_turnspassed"];
                             match.BoardState = reader["_boardstate"] is DBNull ? null : (int[])reader["_boardstate"];
                             
                             matches.Add(match);

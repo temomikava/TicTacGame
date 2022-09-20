@@ -11,7 +11,7 @@ namespace WebAPI
             this.next = next;
         }
         Guid guid = new Guid();
-        public async Task InvokeAsync(HttpContext httpContext)
+        public Task Invoke(HttpContext httpContext)
         {
             if (httpContext.Request.Path.StartsWithSegments("/signalr"))
             {
@@ -28,17 +28,15 @@ namespace WebAPI
                 if (id == -1)
                 {
                     httpContext.Response.StatusCode = 401;
-                    return;
                 }
 
                 var identity = new ClaimsIdentity();
                 identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
                 identity.AddClaim(new Claim(ClaimTypes.Role, validSessionId.ToString()));
                 httpContext.User.AddIdentity(identity);
-                await next.Invoke(httpContext);
-                return;
+                return next.Invoke(httpContext);
             }
-            await next.Invoke(httpContext);
+           return next.Invoke(httpContext);
         }
     }
 }

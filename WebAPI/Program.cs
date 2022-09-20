@@ -18,7 +18,12 @@ builder.Services.AddControllers();
 builder.Services.AddSignalR(o=>o.EnableDetailedErrors=true)
     .AddNewtonsoftJsonProtocol(opts =>
         opts.PayloadSerializerSettings.TypeNameHandling = TypeNameHandling.Auto);
-
+Host.CreateDefaultBuilder(args)
+                .ConfigureLogging(logging =>
+                {
+                    logging.AddFilter("Microsoft.AspNetCore.SignalR", LogLevel.Debug);
+                    logging.AddFilter("Microsoft.AspNetCore.Http.Connections", LogLevel.Debug);
+                });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
