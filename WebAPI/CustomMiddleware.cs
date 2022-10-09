@@ -11,6 +11,7 @@ namespace WebAPI
             this.next = next;
         }
         Guid guid = new Guid();
+        int id = 0;
         public Task Invoke(HttpContext httpContext)
         {
             if (httpContext.Request.Path.StartsWithSegments("/signalr"))
@@ -20,10 +21,10 @@ namespace WebAPI
                 if (isValidSessionId)
                 {
                     guid = validSessionId;
+                    var dal = httpContext.RequestServices.GetRequiredService<IDatabaseConnection>();
+                    id = dal.GetUserId(guid);
                 }
 
-                var dal = httpContext.RequestServices.GetRequiredService<IDatabaseConnection>();
-                var id = dal.GetUserId(guid);
 
                 if (id == -1)
                 {
@@ -32,7 +33,7 @@ namespace WebAPI
 
                 var identity = new ClaimsIdentity();
                 identity.AddClaim(new Claim(ClaimTypes.Name, id.ToString()));
-                identity.AddClaim(new Claim(ClaimTypes.Role, validSessionId.ToString()));
+                identity.AddClaim(new Claim(ClaimTypes.Role, guid.ToString()));
                 httpContext.User.AddIdentity(identity);
                 return next.Invoke(httpContext);
             }

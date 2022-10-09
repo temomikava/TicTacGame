@@ -16,8 +16,8 @@ namespace GameLibrary
         public WinInfo WinInfo { get; set; } = new();
         public MatchResult MatchResult { get;  set; }=new();
 
-        public static event Action<int, int> MoveMade;
-        public static event Action<MatchResult> MatchEnded;
+        //public static event Action<int, int> MoveMade;
+        //public static event Action<MatchResult> MatchEnded;
         //public static event Action MatchRestarted;
         private bool IsGridFull()
         {
