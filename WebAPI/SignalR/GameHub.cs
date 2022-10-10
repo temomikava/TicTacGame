@@ -34,19 +34,23 @@ namespace WebAPI.SignalR
             string connid = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             await _connection.OnConnected(id);
 
-            
-            
-            
-            _users.TryAdd(id, new HashSet<string>() { connid });
-            _hubConnections.TryAdd(id, new HashSet<string> { Context.ConnectionId });
 
-            if (!_users[id].Contains(connid))
+
+            _users.TryAdd(id, new HashSet<string>() );
+            _hubConnections.TryAdd(id, new HashSet<string> ());
+            if (_hubConnections[id].Count()==0)
             {
-                await Clients.Client(_hubConnections[id].Single()).SendAsync("disconnect", "you are connected from another session");
-                _users[id].Clear();
+                _hubConnections[id].Add(Context.ConnectionId);
                 _users[id].Add(connid);
-                
             }
+            if ( !_users[id].Contains(connid)  )
+            {
+                
+                await Clients.Client(_hubConnections[id].First()).SendAsync("disconnect", "you are connected from another session");
+
+            }
+            _users[id].Add(connid);
+            _hubConnections[id].Add(Context.ConnectionId);
 
 
 
@@ -96,18 +100,17 @@ namespace WebAPI.SignalR
 
             //var gamesForReconnect = games.Where(x => x.StateId != (int)StateType.Started && x.PlayerTwo.Id != 0).ToList();
             var gamesForReconnect = (from game in games
-                                     where game.PlayerTwo.Id != 0 && game.StateId != (int)StateType.Started
+                                     where game.PlayerTwo.Id != 0
                                      select game).ToList();
 
             if (gamesForReconnect.Count() > 0)
             {
-                var idd = Context.ConnectionId;
                 var gamesForReconnectDTO = mapper.Map<IEnumerable<GameDTO>>(gamesForReconnect);
                 await Clients.Caller.SendAsync("gamesforreconnect", gamesForReconnectDTO);
             }
             await base.OnConnectedAsync();
         }
-      
+
         public async Task Reconnect(ReconnectRequest request)
         {
             int gameId = request.GameId;
@@ -158,7 +161,7 @@ namespace WebAPI.SignalR
                     await Clients.User(game.PlayerTwo.Id.ToString()).SendAsync("alert", 1, "opponent connected! ");
 
                 }
-                else
+                else if (game.StateId == (int)StateType.NoOneIsConnected)
                 {
                     await _connection.WaitingForReconnect(game.GameId, (int)StateType.PlayerOneIsConnected);
                 }
@@ -171,31 +174,28 @@ namespace WebAPI.SignalR
                     await Clients.User(game.PlayerOne.Id.ToString()).SendAsync("alert", 1, "opponent connected! ");
 
                 }
-                else
+                else if (game.StateId == (int)StateType.NoOneIsConnected)
                 {
                     await _connection.WaitingForReconnect(game.GameId, (int)StateType.PlayerTwoIsConnected);
                 }
             }
+            if (_rejoinableGames.ContainsKey(id))
+            {
+                var num = _rejoinableGames[id].RemoveAll(x => x.GameId == game.GameId);
+                var gamesDTOs = mapper.Map<IEnumerable<GameDTO>>(_rejoinableGames[id]);
+                await Clients.Caller.SendAsync("gamesforreconnect", gamesDTOs);
+            }
 
-            var num = _rejoinableGames[id].RemoveAll(x => x.GameId == game.GameId);
-            var gamesDTOs = mapper.Map<IEnumerable<GameDTO>>(_rejoinableGames[id]);
-            await Clients.Caller.SendAsync("gamesforreconnect", gamesDTOs);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             string connId = Context.User.Claims.First(x => x.Type == ClaimTypes.Role).Value;
             int id = int.Parse(Context.User.Claims.First(x => x.Type == ClaimTypes.Name).Value);
-            _hubConnections.Remove(id, out var _);
 
-            if (_users[id].Count > 1)
-            {
-                _users[id].Remove(connId);
-            }
-            else
-            {
-                _users.Remove(id, out var _);
 
-            }
+            _users[id].Clear();
+            _hubConnections[id].Clear();
+
 
             await _connection.Ondisconnected(id);
 
@@ -210,7 +210,7 @@ namespace WebAPI.SignalR
                         await _connection.WaitingForReconnect(game.GameId, (int)StateType.PlayerTwoIsConnected);
                         await Clients.User(game.PlayerTwo.Id.ToString()).SendAsync("alert", -1, "opponent disconnected, wait for reconnect! ");
                     }
-                    else
+                    else if (game.StateId == (int)StateType.PlayerOneIsConnected)
                     {
                         await _connection.WaitingForReconnect(game.GameId, (int)StateType.NoOneIsConnected);
                     }
@@ -223,7 +223,7 @@ namespace WebAPI.SignalR
                         await Clients.User(game.PlayerOne.Id.ToString()).SendAsync("alert", -1, "opponent disconnected, wait for reconnect! ");
 
                     }
-                    else
+                    else if (game.StateId == (int)StateType.PlayerTwoIsConnected)
                     {
                         await _connection.WaitingForReconnect(game.GameId, (int)StateType.NoOneIsConnected);
                     }
@@ -237,7 +237,7 @@ namespace WebAPI.SignalR
 
             _rejoinableGames.TryAdd(id, rejoinableGames);
 
-           
+
 
             //--after timer
 
